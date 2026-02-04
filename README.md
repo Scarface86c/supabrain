@@ -42,8 +42,33 @@ Layer 3-5: Full Details (200-2000+ tokens)
 **How it works:**
 1. Agent queries: "What did we decide about BCT?"
 2. SupaBrain searches Layer 1 (cheap, fast)
-3. If match found, expand to Layer 2, then 3-5 as needed
+3. If match found, expand to Layer 2, then 3 as needed
 4. **Result:** Only load detail when relevant
+
+### 🗂️ Memory Domains
+
+Just like human memory, SupaBrain organizes information by type:
+
+| Domain | Description | Examples |
+|--------|-------------|----------|
+| **facts** | Factual information | "PostgreSQL uses port 5432" |
+| **experiences** | Events that happened | "Built SupaBrain today" |
+| **skills** | How-to knowledge | "How to restart the server" |
+| **preferences** | Likes/dislikes/styles | "Scarface prefers direct communication" |
+| **decisions** | Choices made | "Decided to use CPU-only embeddings" |
+| **context** | Project/topic background | "BCT is a crypto trading bot" |
+
+**Auto-classification:**
+SupaBrain automatically detects the memory type based on content analysis. You can also specify it manually.
+
+```bash
+# Auto-classified as "skills"
+remember("How to restart SupaBrain: kill process and run server.py")
+
+# Query specific domain
+recall(query="preferences", memory_type="preferences")
+→ Returns only preference-type memories
+```
 
 ### 🔍 Hybrid Search
 
@@ -235,15 +260,19 @@ const memories = await recall("BCT decisions", { maxLayer: 2 });
 
 ## 🎨 Features
 
-- ✅ **Multi-layer storage** (5 levels of detail)
-- ✅ **Hybrid search** (semantic + keyword)
-- ✅ **Auto-layering** (ML-based importance detection)
+- ✅ **Multi-layer storage** (3 layers: summary → context → details)
+- ✅ **Semantic search** (sentence-transformers, CPU-only)
+- ✅ **Memory domains** (facts, experiences, skills, preferences, decisions, context)
+- ✅ **Auto-classification** (intelligent type detection)
 - ✅ **Token-efficient** (load only what you need)
-- ✅ **PostgreSQL backend** (reliable, scalable)
-- ✅ **OpenClaw integration** (easy skill installation)
+- ✅ **PostgreSQL + pgvector** (reliable vector search)
+- ✅ **Access tracking** (usage analytics)
+- ✅ **Low-resource friendly** (works on VPS, Raspberry Pi)
+- 🚧 **LLM summarization** (better than truncation)
 - 🚧 **Memory consolidation** (merge similar memories)
 - 🚧 **Temporal decay** (older = less detailed)
 - 🚧 **Cross-agent sharing** (opt-in memory pools)
+- 🚧 **OpenClaw skill** (Node.js wrapper)
 
 ---
 
