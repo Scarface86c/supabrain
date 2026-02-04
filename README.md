@@ -94,9 +94,19 @@ Layer 3-5: Full Details (200-2000+ tokens)
 
 ### Prerequisites
 
+**Software:**
 - Python 3.10+
 - PostgreSQL 14+ with pgvector extension
-- Node.js 18+ (for OpenClaw integration)
+- Node.js 18+ (optional, for OpenClaw integration)
+
+**Hardware (Minimal):**
+- **CPU:** Any modern CPU (no GPU required!)
+- **RAM:** 512 MB minimum (1 GB recommended)
+- **Storage:** ~500 MB for dependencies + database
+- **Works on:** VPS, Raspberry Pi 4, old laptops, cheap cloud instances
+
+**Why CPU-only?**
+SupaBrain is designed to run on low-resource systems. Many AI agents don't have access to GPUs, so we use lightweight CPU-only models (sentence-transformers/all-MiniLM-L6-v2, ~90MB) that work everywhere.
 
 ### Installation
 
@@ -132,7 +142,58 @@ openclaw skills install .
 
 ## 📖 Usage
 
-### Python API (Direct)
+### Quick Start (REST API)
+
+**1. Store a Memory**
+```bash
+curl -X POST http://localhost:8080/api/v1/remember \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "Today Scar built SupaBrain - a multi-layer memory system...",
+    "agent_name": "Scar",
+    "tags": ["supabrain", "project"],
+    "importance_score": 0.9
+  }'
+
+# Response:
+# {"success": true, "memory_id": 1}
+```
+
+**2. Recall Memories (Semantic Search)**
+```bash
+curl -X POST http://localhost:8080/api/v1/recall \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What did we build today?",
+    "agent_name": "Scar",
+    "max_layer": 2,
+    "limit": 5
+  }'
+
+# Response:
+# [
+#   {
+#     "id": 1,
+#     "content": "Today Scar built SupaBrain...",
+#     "similarity": 0.85,
+#     "tags": ["supabrain", "project"]
+#   }
+# ]
+```
+
+**3. Get Stats**
+```bash
+curl "http://localhost:8080/api/v1/stats?agent_name=Scar"
+
+# Response:
+# {
+#   "total_memories": 3,
+#   "average_importance": 0.85,
+#   "total_accesses": 7
+# }
+```
+
+### Python API (Direct) - Coming Soon
 
 ```python
 from supabrain import SupaBrain
@@ -142,8 +203,7 @@ brain = SupaBrain(db_url="postgresql://localhost/supabrain")
 # Store memory with auto-layering
 brain.remember(
     content="We discussed BCT (BibisCryptoTrading) project...",
-    tags=["bct", "crypto", "trading"],
-    layer=3  # Optional: specify layer, or let it auto-decide
+    tags=["bct", "crypto", "trading"]
 )
 
 # Recall memories
@@ -153,10 +213,10 @@ results = brain.recall(
 )
 
 for memory in results:
-    print(f"Layer {memory.layer}: {memory.content}")
+    print(f"Similarity {memory.similarity}: {memory.content}")
 ```
 
-### OpenClaw Skill (Node.js)
+### OpenClaw Skill (Node.js) - Coming Soon
 
 ```javascript
 // In your OpenClaw agent
@@ -164,8 +224,7 @@ const { remember, recall } = require('supabrain-skill');
 
 // Store
 await remember("Important decision about BCT...", { 
-  tags: ["bct", "decision"],
-  layer: 3 
+  tags: ["bct", "decision"]
 });
 
 // Recall
@@ -205,11 +264,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## 📊 Roadmap
 
-### v0.1 - MVP (Current)
+### v0.1 - MVP ✅ COMPLETE (2026-02-04)
 - [x] Repository setup
-- [ ] Core Python server
-- [ ] Basic storage & retrieval
-- [ ] PostgreSQL schema
+- [x] Core Python server (FastAPI)
+- [x] Basic storage & retrieval (remember/recall)
+- [x] PostgreSQL schema with pgvector
+- [x] CPU-only embeddings (sentence-transformers)
+- [x] Multi-layer storage (3 layers working)
+- [x] Semantic search with similarity ranking
+- [x] Access tracking
 
 ### v0.2 - Search
 - [ ] Semantic search (embeddings)
