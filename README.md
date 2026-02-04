@@ -229,6 +229,29 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
+## 💰 Support the Project
+
+If SupaBrain helps your agent remember better, consider supporting development:
+
+**Bitcoin (BTC)**
+```
+38ivSsxwwp2AHvCwadJbrG15FdJekdqmpQ
+```
+
+**Ethereum (ETH)**
+```
+0xf86e6988713A0d1fDF194fd17eca0099265839CA
+```
+
+**Cardano (ADA)**
+```
+DdzFFzCqrhtC18WR8MUsMSf5VLGnuo784jjkUKSqHTV8z3hPHAD4pBBPa1Fs9gsQCdXJ6udRVEbEbf4iz3rjDteHLB8DHeNeUzGfP1TN
+```
+
+Your contributions help keep this project open and free. Thank you! 🙏
+
+---
+
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
