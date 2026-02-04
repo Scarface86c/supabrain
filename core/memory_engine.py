@@ -75,13 +75,52 @@ class MemoryEngine:
             "layer_3": layer_3
         }
     
+    def _classify_memory_type(self, content: str, tags: List[str]) -> str:
+        """
+        Auto-classify memory type based on content and tags
+        
+        Types:
+        - facts: Factual information
+        - experiences: Events that happened
+        - skills: How to do something
+        - preferences: Likes/dislikes/styles
+        - decisions: Choices made
+        - context: Project/topic background
+        """
+        content_lower = content.lower()
+        tags_str = ' '.join(tags).lower()
+        
+        # Preference indicators
+        if any(word in content_lower for word in ['prefer', 'like', 'hate', 'love', 'dislike', 'values', 'style']):
+            return 'preferences'
+        
+        # Decision indicators
+        if any(word in content_lower for word in ['decided', 'decision', 'chose', 'will use', 'strategy']):
+            return 'decisions'
+        
+        # Experience indicators (past tense, events)
+        if any(word in content_lower for word in ['built', 'created', 'today', 'yesterday', 'happened', 'did']):
+            return 'experiences'
+        
+        # Skill indicators
+        if any(word in content_lower for word in ['how to', 'guide', 'tutorial', 'steps to', 'method']):
+            return 'skills'
+        
+        # Context indicators (project info)
+        if any(word in tags_str for word in ['project', 'system', 'overview', 'about']):
+            return 'context'
+        
+        # Default: facts
+        return 'facts'
+    
     async def remember(
         self,
         content: str,
         agent_name: str = "default",
         tags: Optional[List[str]] = None,
         source_type: Optional[str] = None,
-        importance_score: float = 0.5
+        importance_score: float = 0.5,
+        memory_type: Optional[str] = None
     ) -> int:
         """
         Store a new memory
@@ -91,6 +130,10 @@ class MemoryEngine:
         """
         if tags is None:
             tags = []
+        
+        # Auto-classify memory type if not provided
+        if memory_type is None:
+            memory_type = self._classify_memory_type(content, tags)
             
         # Generate layers
         layers = self._auto_layer_content(content)
@@ -128,8 +171,9 @@ class MemoryEngine:
                     layer_2_embedding,
                     tags,
                     importance_score,
-                    source_type
-                ) VALUES ($1, $2, $3, $4, $5::vector, $6::vector, $7, $8, $9)
+                    source_type,
+                    memory_type
+                ) VALUES ($1, $2, $3, $4, $5::vector, $6::vector, $7, $8, $9, $10)
                 RETURNING id
                 """,
                 agent_id,
@@ -140,7 +184,8 @@ class MemoryEngine:
                 emb_2_str,
                 tags,
                 importance_score,
-                source_type
+                source_type,
+                memory_type
             )
             
         return memory_id
@@ -152,7 +197,8 @@ class MemoryEngine:
         max_layer: int = 2,
         limit: int = 10,
         min_score: float = 0.5,
-        tags: Optional[List[str]] = None
+        tags: Optional[List[str]] = None,
+        memory_type: Optional[str] = None
     ) -> List[Dict]:
         """
         Search for memories matching query
@@ -194,6 +240,7 @@ class MemoryEngine:
                     m.importance_score,
                     m.access_count,
                     m.created_at,
+                    m.memory_type,
                     1 - (m.layer_1_embedding <=> $2::vector) as similarity
                 FROM memories m
                 WHERE m.agent_id = $1
@@ -203,8 +250,13 @@ class MemoryEngine:
             
             # Optional tag filter
             if tags:
-                sql += " AND m.tags && $3"
+                sql += " AND m.tags && $%d" % (len(params) + 1)
                 params.append(tags)
+            
+            # Optional memory type filter
+            if memory_type:
+                sql += " AND m.memory_type = $%d" % (len(params) + 1)
+                params.append(memory_type)
             
             # Order by similarity and limit
             sql += """
@@ -228,7 +280,8 @@ class MemoryEngine:
                     "importance_score": row['importance_score'],
                     "access_count": row['access_count'],
                     "similarity": float(row['similarity']),
-                    "created_at": row['created_at'].isoformat()
+                    "created_at": row['created_at'].isoformat(),
+                    "memory_type": row['memory_type']
                 }
                 
                 # Add more detail based on max_layer

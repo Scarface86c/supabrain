@@ -50,6 +50,7 @@ class MemoryCreate(BaseModel):
     tags: Optional[List[str]] = []
     source_type: Optional[str] = None
     importance_score: Optional[float] = 0.5
+    memory_type: Optional[str] = None  # Auto-classified if not provided
 
 
 class MemoryQuery(BaseModel):
@@ -59,6 +60,7 @@ class MemoryQuery(BaseModel):
     limit: int = 10
     min_score: float = 0.5
     tags: Optional[List[str]] = None
+    memory_type: Optional[str] = None  # Filter by type (facts, experiences, etc.)
 
 
 class MemoryResponse(BaseModel):
@@ -69,6 +71,7 @@ class MemoryResponse(BaseModel):
     access_count: int
     similarity: float
     created_at: str
+    memory_type: Optional[str] = None
 
 
 class RememberResponse(BaseModel):
@@ -136,7 +139,8 @@ async def remember(memory: MemoryCreate):
             agent_name=memory.agent_name,
             tags=memory.tags or [],
             source_type=memory.source_type,
-            importance_score=memory.importance_score
+            importance_score=memory.importance_score,
+            memory_type=memory.memory_type
         )
         
         return RememberResponse(
@@ -168,7 +172,8 @@ async def recall(query: MemoryQuery):
             max_layer=query.max_layer,
             limit=query.limit,
             min_score=query.min_score,
-            tags=query.tags
+            tags=query.tags,
+            memory_type=query.memory_type
         )
         
         return [MemoryResponse(**r) for r in results]
