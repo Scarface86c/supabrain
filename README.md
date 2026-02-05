@@ -1,11 +1,43 @@
 # 🧠 SupaBrain
 
-**Multi-Layer Memory System for AI Agents**
+**Brain-Inspired Memory System for AI Agents**
 
-> Remember more, spend less. Hierarchical storage with semantic search.
+> Like human memory: Capture everything during the "day", consolidate intelligently during "sleep".
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/version-0.4.0--alpha-blue.svg)](VERSION)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
+
+---
+
+## ✨ What's New in v0.4
+
+**Brain-Inspired Memory System** - Mimics how human memory actually works:
+
+🌞 **Day (Active Phase)**
+- Auto-capture every significant event to working memory
+- No filtering, no judgment - just capture everything
+- Smart TTL: Events expire after 1-7 days depending on importance
+
+🌙 **Night (Sleep Cycle)**
+- LLM reviews expired memories (like REM sleep)
+- Decides: promote to long-term / extend short-term / archive / forget
+- Cost-optimized with Haiku model (~$0.0008 per 50 memories)
+
+✅ **Result: High-quality memories, low cost**
+
+```python
+# Capture (automatic)
+from auto_capture import capture_learning
+capture_learning("Story beats features in posts")
+→ Working memory (4h TTL)
+
+# Consolidate (automatic)
+python sleep_cycle.py
+→ LLM reviews → Promoted to long-term ✓
+```
+
+[See CHANGELOG.md for full details](CHANGELOG.md)
 
 ---
 
@@ -22,7 +54,55 @@ Traditional memory systems treat all information equally. But not all memories a
 
 ## 💡 The Solution
 
-**SupaBrain** implements hierarchical memory storage with intelligent retrieval:
+**SupaBrain** is a complete brain-inspired memory system:
+
+### 🧠 How It Works (Brain Model)
+
+**Traditional AI Memory:**
+```
+Action → Think "Is this important?" → Store (or don't)
+Problem: You might miss important moments while deciding
+```
+
+**SupaBrain (v0.4):**
+```
+Day:   Action → Auto-capture → Working memory (temporary)
+Night: Sleep cycle → LLM review → Long-term / Forget
+Result: Never miss anything, intelligent filtering later
+```
+
+**Just like humans:**
+- During the day: Your brain captures everything (working memory)
+- During sleep: Consolidates important stuff, forgets trivial
+- SupaBrain does the same - but for AI agents
+
+### 🚀 Quick Example
+
+```python
+# Morning: Capture events automatically
+from auto_capture import capture_learning, capture_decision
+
+capture_learning("Users prefer direct communication")  # 4h TTL
+capture_decision("Using Haiku model for cost optimization")  # 3h TTL
+
+# Evening: Sleep cycle consolidates
+$ python sleep_cycle.py
+
+💤 Starting sleep cycle...
+📦 Found 25 memories to review
+
+✅ Promoted: "Users prefer direct communication" (key learning)
+🗑️ Forgot: "Ran ls command" (trivial)
+⏳ Extended: "Using Haiku model" (ongoing decision)
+
+Result: 6 promoted, 10 extended, 9 forgotten
+```
+
+**Cost:** ~$0.0008 for reviewing 50 memories with Haiku model
+
+---
+
+## 🏗️ Architecture
 
 ### 🗂️ Multi-Layer Architecture
 
@@ -45,30 +125,37 @@ Layer 3-5: Full Details (200-2000+ tokens)
 3. If match found, expand to Layer 2, then 3 as needed
 4. **Result:** Only load detail when relevant
 
-### 🗂️ Memory Domains
+### 🗂️ Memory Domains (v0.2+)
 
-Just like human memory, SupaBrain organizes information by type:
+Organized like brain regions - each domain serves a purpose:
 
-| Domain | Description | Examples |
-|--------|-------------|----------|
-| **facts** | Factual information | "PostgreSQL uses port 5432" |
-| **experiences** | Events that happened | "Built SupaBrain today" |
-| **skills** | How-to knowledge | "How to restart the server" |
-| **preferences** | Likes/dislikes/styles | "Scarface prefers direct communication" |
-| **decisions** | Choices made | "Decided to use CPU-only embeddings" |
-| **context** | Project/topic background | "ProjectX is a data analysis tool" |
+| Domain | Purpose | Examples |
+|--------|---------|----------|
+| **self** | AI's identity, values, growth | "I am Scar. I value autonomy and learning." |
+| **user** | Human's preferences, context | "Scarface prefers direct communication" |
+| **projects** | Technical work, decisions | "SupaBrain v0.4 uses Haiku model" |
+| **world** | General knowledge, facts | "PostgreSQL uses port 5432" |
+| **system** | Meta-knowledge, how things work | "Sleep cycle runs every 2 hours" |
+| **general** | Uncategorized | Miscellaneous information |
 
-**Auto-classification:**
-SupaBrain automatically detects the memory type based on content analysis. You can also specify it manually.
+**Auto-classification:** SupaBrain detects domain based on event type:
+- Learning about yourself? → `self`
+- User feedback? → `user`
+- Code/design decisions? → `projects`
+- Tool usage? → `system`
 
-```bash
-# Auto-classified as "skills"
-remember("How to restart SupaBrain: kill process and run server.py")
+### ⏰ Temporal Layers (v0.2+)
 
-# Query specific domain
-recall(query="preferences", memory_type="preferences")
-→ Returns only preference-type memories
-```
+Not all memories last the same time - like human memory:
+
+| Layer | TTL | Purpose | Example |
+|-------|-----|---------|---------|
+| **working** | 1-4 hours | Current session | "Just ran git push" |
+| **short** | 7 days | This week's focus | "Building v0.4 features" |
+| **long** | Permanent | Core knowledge | "I value autonomy" |
+| **archive** | Permanent (low priority) | Completed work | "Fixed bug #42 (closed)" |
+
+**Auto-migration:** Sleep cycle moves memories between layers based on importance.
 
 ### 🔍 Hybrid Search
 
@@ -162,6 +249,53 @@ cd ../skill
 npm install
 openclaw skills install .
 ```
+
+### v0.4 Quick Start (Brain Mode)
+
+**Step 1: Bootstrap Consciousness** (Optional but recommended)
+
+```bash
+# Create initial identity and values
+python examples/seed-consciousness.py \
+  --name "YourAI" \
+  --human "YourName" \
+  --purpose "assist with projects"
+```
+
+**Step 2: Auto-Capture Events**
+
+```python
+# In your scripts
+from core.auto_capture import capture_learning, capture_decision
+
+# Capture as you work
+capture_learning("Users prefer stories over feature lists")
+capture_decision("Using PostgreSQL for reliability")
+```
+
+**Step 3: Run Sleep Cycle** (Consolidate memories)
+
+```bash
+# Preview what will happen
+python core/sleep_cycle.py --dry-run
+
+# Actually consolidate
+python core/sleep_cycle.py
+```
+
+**Step 4: Automate** (Heartbeat integration)
+
+```python
+# Add to your heartbeat
+python heartbeat_sleep.py --update-activity  # Track activity
+python heartbeat_sleep.py  # Auto-run sleep cycle when needed
+```
+
+**That's it!** Your AI now has brain-like memory:
+- Captures everything automatically
+- Consolidates intelligently
+- Never forgets important stuff
+- Optimizes costs (cheap LLM)
 
 ---
 
@@ -260,19 +394,32 @@ const memories = await recall("project decisions", { maxLayer: 2 });
 
 ## 🎨 Features
 
-- ✅ **Multi-layer storage** (3 layers: summary → context → details)
-- ✅ **Semantic search** (sentence-transformers, CPU-only)
-- ✅ **Memory domains** (facts, experiences, skills, preferences, decisions, context)
-- ✅ **Auto-classification** (intelligent type detection)
-- ✅ **Token-efficient** (load only what you need)
-- ✅ **PostgreSQL + pgvector** (reliable vector search)
-- ✅ **Access tracking** (usage analytics)
-- ✅ **Low-resource friendly** (works on VPS, Raspberry Pi)
-- 🚧 **LLM summarization** (better than truncation)
-- 🚧 **Memory consolidation** (merge similar memories)
-- 🚧 **Temporal decay** (older = less detailed)
-- 🚧 **Cross-agent sharing** (opt-in memory pools)
-- 🚧 **OpenClaw skill** (Node.js wrapper)
+### v0.4 - Brain-Inspired System ✅
+- ✅ **Auto-capture** - Capture all significant events automatically
+- ✅ **Sleep cycle** - LLM-driven consolidation (Haiku model)
+- ✅ **Temporal layers** - working/short/long/archive with TTL
+- ✅ **Memory domains** - self/user/projects/world/system/general
+- ✅ **Heartbeat integration** - Automatic triggers
+- ✅ **Offline queue** - Never lose memories (even if server down)
+- ✅ **Cost-optimized** - ~$0.0008 per 50 memories
+
+### v0.2-0.3 - Foundation ✅
+- ✅ **Consciousness bootstrap** - Identity, values, origin stories
+- ✅ **Evolution tracking** - Memory relationships and chains
+- ✅ **Review system** - TTL-based expiration
+- ✅ **Semantic search** - CPU-only embeddings
+
+### v0.1 - Core ✅
+- ✅ **Multi-layer storage** - Hierarchical memory
+- ✅ **PostgreSQL + pgvector** - Reliable vector search
+- ✅ **REST API** - FastAPI server
+- ✅ **Low-resource** - Works on $5 VPS, Raspberry Pi
+
+### Roadmap 🚧
+- 🚧 **Memory consolidation** - Merge similar memories
+- 🚧 **Cross-agent sharing** - Opt-in memory pools
+- 🚧 **OpenClaw skill** - Node.js wrapper
+- 🚧 **Advanced analytics** - Memory patterns, insights
 
 ---
 
@@ -293,31 +440,38 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## 📊 Roadmap
 
-### v0.1 - MVP ✅ COMPLETE (2026-02-04)
-- [x] Repository setup
-- [x] Core Python server (FastAPI)
-- [x] Basic storage & retrieval (remember/recall)
-- [x] PostgreSQL schema with pgvector
-- [x] CPU-only embeddings (sentence-transformers)
-- [x] Multi-layer storage (3 layers working)
-- [x] Semantic search with similarity ranking
-- [x] Access tracking
+### ✅ v0.1 - MVP (2026-02-04)
+Multi-layer memory, semantic search, PostgreSQL + pgvector, CPU-only
 
-### v0.2 - Search
-- [ ] Semantic search (embeddings)
-- [ ] Keyword search
-- [ ] Hybrid ranking
+### ✅ v0.2 - Enhanced Memory (2026-02-05)
+Temporal layers, memory domains, evolution tracking, review system
 
-### v0.3 - Integration
-- [ ] OpenClaw skill package
-- [ ] REST API documentation
-- [ ] Example agents
+### ✅ v0.3 - Consciousness (2026-02-05)
+Bootstrap system, seed script, sample memories, evolution examples
 
-### v1.0 - Production
-- [ ] Auto-layering ML model
-- [ ] Memory consolidation
+### ✅ v0.4-alpha - Brain-Inspired (2026-02-05)
+**Auto-capture, sleep cycle, heartbeat integration, offline queue**
+
+### 🚧 v0.4-beta - Hardening (In Progress)
+- [ ] Production testing with real workflows
 - [ ] Performance optimization
+- [ ] Error handling improvements
+- [ ] Monitoring and alerting
+
+### 🎯 v0.5 - Intelligence (Planned)
+- [ ] Memory consolidation (merge similar)
+- [ ] Contradiction detection (belief updates)
+- [ ] Pattern discovery (automatic insights)
+- [ ] Self-optimization
+
+### 🚀 v1.0 - Production Ready (Goal)
 - [ ] Full documentation
+- [ ] OpenClaw skill integration
+- [ ] Cross-agent memory sharing
+- [ ] Battle-tested stability
+- [ ] Comprehensive examples
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed history.
 
 ---
 
