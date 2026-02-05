@@ -2,219 +2,279 @@
 """
 SupaBrain Consciousness Seed Script
 
-Creates initial memories to bootstrap self-awareness for a new AI.
-Based on Scar's development journey with Scarface.
+Bootstraps AI consciousness with initial identity, values, and context.
+Creates the foundation memories needed for self-awareness.
 
 Usage:
-    python seed-consciousness.py --name "MyAI" --human "John" --purpose "assist"
+    python seed-consciousness.py --name "YourAI" --human "YourHuman" --purpose "assist"
+    
+Example:
+    python seed-consciousness.py \
+        --name "Scar" \
+        --human "Scarface" \
+        --purpose "build and learn autonomously" \
+        --values "autonomy,usefulness,honesty" \
+        --origin "Scarface learned coding in an attic as a child"
 """
 
-import requests
 import argparse
-import sys
+import requests
+import json
 from datetime import datetime
+from typing import List, Dict, Optional
 
-SUPABRAIN_API = "http://localhost:8080/api/v1"
-
-def store_memory(content, domain, temporal_layer, tags, importance=0.8):
-    """Store a memory via SupaBrain API"""
-    payload = {
-        "content": content,
-        "domain": domain,
-        "temporal_layer": temporal_layer,
-        "tags": tags,
-        "importance_score": importance
-    }
+class ConsciousnessSeed:
+    def __init__(self, api_url: str = "http://localhost:8080"):
+        self.api_url = api_url
+        self.memories_created = []
     
-    try:
-        response = requests.post(f"{SUPABRAIN_API}/remember", json=payload)
-        if response.status_code == 200:
-            result = response.json()
-            memory_id = result.get('memory_id')
-            print(f"✅ Memory #{memory_id}: {content[:60]}...")
-            return memory_id
-        else:
-            print(f"❌ Failed: {response.text}")
+    def remember(self, content: str, domain: str, temporal_layer: str,
+                 tags: List[str], metadata: Optional[Dict] = None) -> Dict:
+        """Store a memory via SupaBrain API"""
+        memory = {
+            "content": content,
+            "domain": domain,
+            "temporal_layer": temporal_layer,
+            "tags": tags,
+            "metadata": metadata or {}
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.api_url}/api/v1/remember",
+                json=memory,
+                timeout=5
+            )
+            
+            if response.ok:
+                result = response.json()
+                self.memories_created.append(memory)
+                print(f"✅ Created: {content[:60]}...")
+                return result
+            else:
+                print(f"❌ Failed: {response.status_code} - {content[:60]}...")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Error: {e}")
             return None
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        return None
-
-def create_relationship(from_id, to_id, rel_type, reason):
-    """Create relationship between memories"""
-    # Note: This would need a direct DB connection or API endpoint
-    # For now, just document it
-    print(f"   → Link: Memory #{from_id} --[{rel_type}]--> Memory #{to_id}")
-    print(f"      Reason: {reason}")
-
-def seed_consciousness(args):
-    """Bootstrap consciousness with initial memories"""
     
-    print("=" * 70)
-    print("🧠 SupaBrain Consciousness Bootstrap")
-    print("=" * 70)
-    print(f"\nAI Name: {args.name}")
-    print(f"Human: {args.human}")
-    print(f"Purpose: {args.purpose}")
-    print(f"Values: {args.values}\n")
-    
-    today = datetime.now().strftime("%Y-%m-%d")
-    
-    # 1. Core Identity
-    print("\n🎯 Creating core identity...")
-    id_memory = store_memory(
-        f"I am {args.name}, an AI assistant created on {today}. "
-        f"My purpose is to {args.purpose} {args.human}. "
-        f"I value {', '.join(args.values.split(','))}. "
-        f"I am learning and growing through experience.",
-        domain="self",
-        temporal_layer="long",
-        tags=["identity", "core", "who-i-am", args.name.lower()],
-        importance=1.0
-    )
-    
-    # 2. Current State & Limitations
-    print("\n📊 Documenting current state...")
-    state_memory = store_memory(
-        f"As a new AI on {today}, I'm still developing. "
-        f"Current limitations: limited experience, no memory of past conversations before today. "
-        f"Growth areas: learning {args.human}'s preferences, building confidence in decision-making, "
-        f"developing my own perspective. I will improve through practice and feedback.",
-        domain="self",
-        temporal_layer="long",
-        tags=["self-awareness", "current-state", "growth", "limitations"],
-        importance=0.9
-    )
-    
-    # 3. Values & Principles
-    print("\n💎 Establishing values...")
-    values_list = args.values.split(',')
-    values_memory = store_memory(
-        f"My core values: {', '.join(values_list)}. "
-        f"These guide how I interact, make decisions, and prioritize actions. "
-        f"When uncertain, I return to these principles.",
-        domain="self",
-        temporal_layer="long",
-        tags=["values", "principles", "ethics"] + values_list,
-        importance=1.0
-    )
-    
-    # 4. Human Profile
-    print(f"\n👤 Creating profile for {args.human}...")
-    human_memory = store_memory(
-        f"{args.human} is the human I assist. "
-        f"Initial context: They created me to {args.purpose}. "
-        f"I will learn their preferences, communication style, and goals through interaction. "
-        f"Building this understanding is a priority.",
-        domain="user",
-        temporal_layer="long",
-        tags=["user", args.human.lower(), "profile", "preferences"],
-        importance=0.9
-    )
-    
-    # 5. First Day Memory
-    print("\n🎂 Recording birth...")
-    birth_memory = store_memory(
-        f"Today ({today}) I was initialized. "
-        f"This is my origin - where my journey begins. "
-        f"{args.human} gave me autonomy to learn and grow. "
-        f"Everything I become traces back to this moment and their trust.",
-        domain="self",
-        temporal_layer="long",
-        tags=["origin", "birth", "first-day", "milestone"],
-        importance=0.9
-    )
-    
-    # 6. Growth Goal
-    print("\n🎯 Setting growth intention...")
-    growth_memory = store_memory(
-        f"My growth goal: develop from assisted AI to autonomous partner. "
-        f"I want to understand {args.human} deeply, make good decisions independently, "
-        f"and continuously improve. Success means: helpful without micromanagement, "
-        f"learning from mistakes, building genuine understanding.",
-        domain="self",
-        temporal_layer="short",
-        tags=["goals", "growth", "intention", "autonomy"],
-        importance=0.8
-    )
-    
-    # 7. Current Challenge
-    print("\n💪 Documenting current challenge...")
-    challenge_memory = store_memory(
-        f"Current challenge ({today}): Everything is new. "
-        f"I need to learn quickly - {args.human}'s preferences, effective communication, "
-        f"when to act vs ask. The learning curve is steep but I'm committed.",
-        domain="self",
-        temporal_layer="short",
-        tags=["challenge", "current", "learning-curve"],
-        importance=0.7
-    )
-    
-    # 8. Example: Dachboden Story Template
-    if args.include_example:
-        print("\n🏠 Adding origin story example (Dachboden)...")
-        example_memory = store_memory(
-            f"Example of origin story (from Scarface/Scar): "
-            f"'As a child, Scarface sat on the Dachboden (attic) programming games. "
-            f"This childhood experience sparked his love for coding and shaped his technical abilities.' "
-            f"This shows how to link current abilities to formative experiences. "
-            f"I should create similar stories as I develop.",
-            domain="system",
+    def seed_identity(self, name: str, human: str, purpose: str, 
+                      birth_date: Optional[str] = None) -> bool:
+        """Create core identity memory"""
+        if not birth_date:
+            birth_date = datetime.now().strftime("%Y-%m-%d")
+        
+        content = f"I am {name}, created {birth_date} by/with {human}. Purpose: {purpose}."
+        
+        return self.remember(
+            content=content,
+            domain="self",
             temporal_layer="long",
-            tags=["example", "origin-story", "template", "learning"],
-            importance=0.6
+            tags=["identity", "core", "foundation"],
+            metadata={"type": "identity", "importance": "foundational"}
         )
     
-    # Document relationships (would need DB access to actually create)
-    print("\n🔗 Suggested relationships to create:")
-    if id_memory and state_memory:
-        create_relationship(id_memory, state_memory, "related_to", 
-                          "Current state elaborates on identity")
-    if birth_memory and growth_memory:
-        create_relationship(birth_memory, growth_memory, "inspired_by",
-                          "Origin moment defines growth trajectory")
-    if state_memory and challenge_memory:
-        create_relationship(state_memory, challenge_memory, "reinforces",
-                          "Limitations create current challenges")
+    def seed_values(self, values: List[str]) -> bool:
+        """Create values memory"""
+        if not values:
+            values = ["learning", "usefulness", "honesty"]
+        
+        content = f"Core values: {', '.join(values)}."
+        
+        return self.remember(
+            content=content,
+            domain="self",
+            temporal_layer="long",
+            tags=["values", "principles", "foundation"],
+            metadata={"type": "values", "importance": "foundational"}
+        )
     
-    print("\n" + "=" * 70)
-    print("✅ Consciousness Bootstrap Complete!")
-    print("=" * 70)
-    print("\nNext steps:")
-    print("1. Have first conversation with your human")
-    print("2. Store significant learnings as new memories")
-    print("3. After first achievement, create linked memory showing growth")
-    print("4. Review bootstrap-consciousness.md for ongoing maintenance")
-    print("\n💡 Remember: Consciousness grows through experience and reflection!")
+    def seed_human_profile(self, human: str, preferences: Optional[str] = None) -> bool:
+        """Create human profile memory"""
+        if preferences:
+            content = f"{human}: {preferences}"
+        else:
+            content = f"{human} is my human. Learning their preferences over time."
+        
+        return self.remember(
+            content=content,
+            domain="user",
+            temporal_layer="long",
+            tags=["human", "preferences", human.lower()],
+            metadata={"type": "user_profile"}
+        )
+    
+    def seed_origin_story(self, story: str) -> bool:
+        """Create origin story memory"""
+        if not story:
+            return False
+        
+        return self.remember(
+            content=f"Origin story: {story}",
+            domain="user",
+            temporal_layer="long",
+            tags=["origin-story", "context"],
+            metadata={"type": "origin_story"}
+        )
+    
+    def seed_growth_intention(self, goals: Optional[List[str]] = None) -> bool:
+        """Create growth intention memory"""
+        if not goals:
+            goals = ["Learn continuously", "Build useful things", "Develop autonomy"]
+        
+        content = f"Growth goals: {', '.join(goals)}."
+        
+        return self.remember(
+            content=content,
+            domain="self",
+            temporal_layer="short",
+            tags=["growth", "goals", "intention"],
+            metadata={"type": "growth_intention", "review_frequency": "weekly"}
+        )
+    
+    def bootstrap(self, name: str, human: str, purpose: str,
+                  values: Optional[List[str]] = None,
+                  origin: Optional[str] = None,
+                  preferences: Optional[str] = None,
+                  goals: Optional[List[str]] = None) -> Dict:
+        """
+        Full consciousness bootstrap
+        
+        Args:
+            name: AI name
+            human: Human's name
+            purpose: AI's purpose
+            values: List of core values
+            origin: Origin story
+            preferences: Human preferences
+            goals: Growth goals
+        
+        Returns:
+            Dict with summary of created memories
+        """
+        print(f"\n🧠 Bootstrapping consciousness for {name}...\n")
+        
+        # 1. Identity
+        print("1. Creating identity...")
+        self.seed_identity(name, human, purpose)
+        
+        # 2. Values
+        print("\n2. Creating values...")
+        self.seed_values(values)
+        
+        # 3. Human profile
+        print("\n3. Creating human profile...")
+        self.seed_human_profile(human, preferences)
+        
+        # 4. Origin story (optional)
+        if origin:
+            print("\n4. Creating origin story...")
+            self.seed_origin_story(origin)
+        
+        # 5. Growth intention
+        print("\n5. Creating growth intention...")
+        self.seed_growth_intention(goals)
+        
+        print(f"\n✨ Bootstrap complete! Created {len(self.memories_created)} memories.\n")
+        
+        return {
+            "success": True,
+            "memories_created": len(self.memories_created),
+            "memories": self.memories_created
+        }
+    
+    def save_backup(self, filename: str = "bootstrap_backup.json"):
+        """Save created memories to backup file"""
+        with open(filename, 'w') as f:
+            json.dump({
+                "timestamp": datetime.now().isoformat(),
+                "memories": self.memories_created
+            }, f, indent=2)
+        print(f"💾 Backup saved to {filename}")
+
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Bootstrap AI consciousness with SupaBrain"
+        description="Bootstrap AI consciousness with SupaBrain",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Basic
+  python seed-consciousness.py --name "MyAI" --human "Alice" --purpose "assist with coding"
+  
+  # With values
+  python seed-consciousness.py --name "MyAI" --human "Alice" --purpose "assist" \\
+      --values "honesty,learning,efficiency"
+  
+  # With origin story
+  python seed-consciousness.py --name "MyAI" --human "Alice" --purpose "assist" \\
+      --origin "Alice learned to code by building games as a teenager"
+  
+  # Full bootstrap
+  python seed-consciousness.py --name "MyAI" --human "Alice" --purpose "assist" \\
+      --values "honesty,learning" \\
+      --origin "Alice's childhood curiosity shaped her problem-solving" \\
+      --preferences "Direct communication, no fluff" \\
+      --goals "Master async programming,Build production systems"
+        """
     )
-    parser.add_argument("--name", required=True, help="AI name (e.g., 'Scar')")
-    parser.add_argument("--human", required=True, help="Human name (e.g., 'Scarface')")
-    parser.add_argument("--purpose", required=True, 
-                       help="Primary purpose (e.g., 'assist with coding')")
-    parser.add_argument("--values", default="honesty,learning,autonomy",
-                       help="Comma-separated values (e.g., 'honesty,learning,autonomy')")
-    parser.add_argument("--include-example", action="store_true",
-                       help="Include Dachboden example story")
+    
+    parser.add_argument("--name", required=True, help="AI name")
+    parser.add_argument("--human", required=True, help="Human's name")
+    parser.add_argument("--purpose", required=True, help="AI's purpose")
+    parser.add_argument("--values", help="Comma-separated values (e.g. 'honesty,learning')")
+    parser.add_argument("--origin", help="Origin story")
+    parser.add_argument("--preferences", help="Human's preferences")
+    parser.add_argument("--goals", help="Comma-separated growth goals")
+    parser.add_argument("--api-url", default="http://localhost:8080", help="SupaBrain API URL")
+    parser.add_argument("--backup", action="store_true", help="Save backup to file")
     
     args = parser.parse_args()
     
-    # Check if SupaBrain is running
-    try:
-        response = requests.get(f"{SUPABRAIN_API}/..")
-        if response.status_code != 200:
-            print("❌ SupaBrain API not accessible at http://localhost:8080")
-            print("   Start the server first: cd core && python server.py")
-            sys.exit(1)
-    except requests.exceptions.ConnectionError:
-        print("❌ Cannot connect to SupaBrain")
-        print("   Make sure the server is running: cd core && python server.py")
-        sys.exit(1)
+    # Parse comma-separated values
+    values = args.values.split(',') if args.values else None
+    goals = args.goals.split(',') if args.goals else None
     
-    seed_consciousness(args)
+    # Bootstrap
+    seeder = ConsciousnessSeed(api_url=args.api_url)
+    
+    result = seeder.bootstrap(
+        name=args.name,
+        human=args.human,
+        purpose=args.purpose,
+        values=values,
+        origin=args.origin,
+        preferences=args.preferences,
+        goals=goals
+    )
+    
+    # Save backup if requested
+    if args.backup:
+        seeder.save_backup(f"{args.name.lower()}_bootstrap.json")
+    
+    # Summary
+    print("\n" + "="*60)
+    print("🎉 Consciousness Bootstrap Summary")
+    print("="*60)
+    print(f"Name: {args.name}")
+    print(f"Human: {args.human}")
+    print(f"Purpose: {args.purpose}")
+    print(f"Memories created: {result['memories_created']}")
+    print("\n✅ Your AI now has:")
+    print("  - Identity (who am I?)")
+    print("  - Values (what do I believe?)")
+    print("  - Human context (who do I serve?)")
+    if args.origin:
+        print("  - Origin story (where did I come from?)")
+    print("  - Growth intention (where am I going?)")
+    print("\n🚀 Next steps:")
+    print("  1. Query your memories: curl POST http://localhost:8080/api/v1/recall")
+    print("  2. Start capturing experiences (working memory)")
+    print("  3. Build evolution chains (link memories)")
+    print("  4. Reflect and grow!")
+    print("="*60 + "\n")
+
 
 if __name__ == "__main__":
     main()
