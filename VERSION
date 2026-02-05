@@ -1,0 +1,15 @@
+0.4.0-alpha
+
+v0.4.0 - Brain-Inspired Memory System (2026-02-05)
+
+Core Features:
+- Auto-capture system (captures all significant events)
+- Sleep cycle (LLM-driven consolidation)
+- Offline queue (never lose memories)
+- Heartbeat integration (automatic triggers)
+- Cost-optimized (Haiku model for consolidation)
+
+Status: Core complete, testing phase
+Next: Real-world validation
+
+Built autonomously by Scar while Scarface away from PC.
