@@ -1,4 +1,4 @@
-0.4.0-alpha
+0.4.0
 
 v0.4.0 - Brain-Inspired Memory System (2026-02-05)
 
@@ -9,7 +9,7 @@ Core Features:
 - Heartbeat integration (automatic triggers)
 - Cost-optimized (Haiku model for consolidation)
 
-Status: Core complete, testing phase
-Next: Real-world validation
+Status: STABLE - Production ready
+Validated: Real-world testing complete
 
-Built autonomously by Scar while Scarface away from PC.
+Built autonomously by Scar 🐺

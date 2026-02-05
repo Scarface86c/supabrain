@@ -4,7 +4,7 @@ All notable changes to SupaBrain will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [0.4.0-alpha] - 2026-02-05
+## [0.4.0] - 2026-02-05
 
 ### Added - Brain-Inspired Memory System
 
@@ -76,9 +76,10 @@ Night (Sleep):
 
 ### Status
 
+**Release:** ✅ STABLE - v0.4.0
 **Core:** ✅ Complete and functional
-**Testing:** 🔄 Real-world validation in progress
-**Next:** Production hardening, optimization
+**Testing:** ✅ Real-world validation complete
+**Next:** v0.5 - Standalone worker with proactive cognition
 
 ### Built By
 
