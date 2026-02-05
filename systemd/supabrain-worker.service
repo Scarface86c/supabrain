@@ -1,0 +1,27 @@
+[Unit]
+Description=SupaBrain Background Worker
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/supabrain
+ExecStart=/home/ubuntu/supabrain/core/venv/bin/python /home/ubuntu/supabrain/core/supabrain_worker.py
+Restart=always
+RestartSec=10
+
+# Environment
+Environment="PATH=/home/ubuntu/supabrain/core/venv/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=/home/ubuntu/supabrain/.env
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=supabrain-worker
+
+[Install]
+WantedBy=multi-user.target

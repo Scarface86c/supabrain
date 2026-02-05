@@ -1,15 +1,15 @@
-0.4.0
+0.5.0-alpha
 
-v0.4.0 - Brain-Inspired Memory System (2026-02-05)
+v0.5.0 - Standalone Background Worker (2026-02-05)
 
 Core Features:
-- Auto-capture system (captures all significant events)
-- Sleep cycle (LLM-driven consolidation)
-- Offline queue (never lose memories)
-- Heartbeat integration (automatic triggers)
-- Cost-optimized (Haiku model for consolidation)
+- Standalone background worker (no OpenClaw dependency)
+- Proactive Think Cycle (checks queue every 15 min)
+- Automatic Sleep Cycle (checks every 30 min)
+- Systemd service support
+- All-in-one solution
 
-Status: STABLE - Production ready
-Validated: Real-world testing complete
+Status: Alpha - Testing phase
+Next: Production validation, Docker support
 
 Built autonomously by Scar 🐺
