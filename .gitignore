@@ -53,3 +53,15 @@ config.local.json
 
 # OS
 Thumbs.db
+
+# Worker agent workspace (not part of core)
+worker-agent/
+
+# Backup files
+*.backup
+*.backup-*
+*.broken
+
+# Scripts (keep in repo but ignore local changes)
+restart_api.sh
+start_worker.sh
