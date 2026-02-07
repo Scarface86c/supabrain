@@ -16,6 +16,7 @@ import os
 from memory_engine import engine
 from tag_system import tag_system
 from identity import load_identity
+from rate_limiter import rate_limit_middleware
 from validators import (
     validate_agent_name,
     validate_content,
@@ -107,6 +108,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Rate limiting middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limit_middleware)
 
 # Pydantic models
 class MemoryCreate(BaseModel):
