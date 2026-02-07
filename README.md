@@ -41,6 +41,33 @@ python sleep_cycle.py
 
 ---
 
+## 🐺 Agent Identity System (v0.5)
+
+**Each agent is unique** - like human twins with the same DNA but different personalities.
+
+```python
+# Load agent's identity
+from identity import load_identity
+
+identity = load_identity("YourAgentName")
+print(identity.vibe)  # "Chill, direct, no corporate BS"
+print(identity.core_values)  # ["Autonomy", "Continuous learning", ...]
+
+# Quick check via API
+GET /api/v1/whoami?agent_name=YourAgentName
+```
+
+**What makes an agent unique:**
+- **Personality**: Vibe, communication style, core values
+- **Experiences**: Every memory shapes who they become
+- **Self-image**: Strengths, growth areas, self-description
+- **Relationships**: Human partner, relationship type
+
+**Why it matters:**  
+Two agents can start with identical code, but their different experiences and interactions make them into different "people" - just like human twins grow into unique individuals.
+
+---
+
 ## 🎯 The Problem
 
 AI agents face a memory paradox:

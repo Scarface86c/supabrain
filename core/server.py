@@ -7,11 +7,66 @@ Multi-Layer Memory System for AI Agents
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Set
 import uvicorn
 from contextlib import asynccontextmanager
+import re
+import os
 
 from memory_engine import engine
+from tag_system import tag_system
+from identity import load_identity
+
+# Configuration
+DEFAULT_AGENT_NAME = os.getenv("DEFAULT_AGENT_NAME", None)  # No default - must be explicit!
+
+
+# Skill extraction patterns
+SKILL_PATTERNS = {
+    'languages': [r'\b(python|javascript|typescript|rust|go|java|c\+\+|bash|sql|html|css)\b'],
+    'frameworks': [
+        r'\b(fastapi|flask|django|react|vue|postgresql|postgres|sqlite|redis|mongodb)\b',
+        r'\b(numpy|pandas|transformers|sentence-transformers|uvicorn)\b',
+    ],
+    'tools': [
+        r'\b(docker|kubernetes|git|github|vscode|vim|openclaw|supabrain)\b',
+        r'\b(whisper|llm|gpt|claude)\b',
+    ],
+    'concepts': [
+        r'\b(autonomous-decision|memory-architecture|api-design|database-design)\b',
+        r'\b(system-architecture|learning-tracking|hierarchical-memory)\b',
+        r'\b(semantic-search|embedding|vector-database)\b',
+    ],
+    'learned': [
+        r'learned\s+(\w+(?:-\w+)*)',
+        r'implemented\s+(\w+(?:-\w+)*)',
+        r'built\s+(\w+(?:-\w+)*)',
+        r'created\s+(\w+(?:-\w+)*)',
+    ],
+}
+
+
+def extract_skills_from_text(text: str, min_length: int = 3) -> List[str]:
+    """Extract skills from text content"""
+    if not text:
+        return []
+    
+    text_lower = text.lower()
+    skills: Set[str] = set()
+    
+    for category, patterns in SKILL_PATTERNS.items():
+        for pattern in patterns:
+            matches = re.findall(pattern, text_lower, re.IGNORECASE)
+            
+            for match in matches:
+                skill = match[0] if isinstance(match, tuple) and match else match
+                
+                if skill and len(skill) >= min_length:
+                    skill_normalized = skill.strip().lower()
+                    if skill_normalized not in {'the', 'and', 'for', 'with', 'from', 'this', 'that'}:
+                        skills.add(skill_normalized)
+    
+    return sorted(list(skills))
 
 
 # Lifespan context manager for startup/shutdown
@@ -46,7 +101,7 @@ app.add_middleware(
 # Pydantic models
 class MemoryCreate(BaseModel):
     content: str
-    agent_name: Optional[str] = "default"
+    agent_name: str  # REQUIRED - each agent has unique identity
     tags: Optional[List[str]] = []
     source_type: Optional[str] = None
     importance_score: Optional[float] = 0.5
@@ -58,7 +113,7 @@ class MemoryCreate(BaseModel):
 
 class MemoryQuery(BaseModel):
     query: str
-    agent_name: Optional[str] = "default"
+    agent_name: str  # REQUIRED - each agent has unique memories
     max_layer: int = 2
     limit: int = 10
     min_score: float = 0.5
@@ -77,11 +132,13 @@ class MemoryResponse(BaseModel):
     access_count: int
     similarity: float
     base_similarity: Optional[float] = None
-    created_at: str
-    memory_type: Optional[str] = None
-    temporal_layer: Optional[str] = None
-    expires_at: Optional[str] = None
-    domain: Optional[str] = None
+
+
+class LearningTrackRequest(BaseModel):
+    skill: str
+    agent_id: str = "default"
+    memory_id: Optional[int] = None
+    notes: Optional[str] = None
 
 
 class RememberResponse(BaseModel):
@@ -94,6 +151,40 @@ class StatsResponse(BaseModel):
     total_memories: int
     average_importance: float
     total_accesses: int
+
+
+class TagStatsResponse(BaseModel):
+    """Tag statistics response"""
+    total_tags: int
+    unique_tags: int
+    top_tags: List[dict]
+    tags_by_category: dict
+    memories_with_tags: int
+
+
+class TagSuggestRequest(BaseModel):
+    """Tag suggestion request"""
+    content: str
+    existing_tags: Optional[List[str]] = []
+    limit: Optional[int] = 5
+
+
+class TagSuggestResponse(BaseModel):
+    """Tag suggestion response"""
+    suggestions: List[str]
+    categories: dict
+
+
+class TagCanonicalizeRequest(BaseModel):
+    """Tag canonicalization request"""
+    tags: List[str]
+
+
+class TagCanonicalizeResponse(BaseModel):
+    """Tag canonicalization response"""
+    original: List[str]
+    canonical: List[str]
+    changes: List[dict]
 
 
 # Health check
@@ -134,20 +225,25 @@ async def health_check():
 async def remember(memory: MemoryCreate):
     """
     Store a new memory with automatic layering and embedding generation
+    NOW WITH AUTO-SKILL EXTRACTION!
     
     Example:
         {
           "content": "Scarface built SupaBrain today. It uses PostgreSQL and pgvector.",
-          "agent_name": "Scar",
+          "agent_name": "example_agent",
           "tags": ["supabrain", "project"],
           "importance_score": 0.8
         }
     """
     try:
+        # Canonicalize tags (apply aliases and normalization)
+        canonical_tags = tag_system.canonicalize_tags(memory.tags or [])
+        
+        # Store memory
         memory_id = await engine.remember(
             content=memory.content,
             agent_name=memory.agent_name,
-            tags=memory.tags or [],
+            tags=canonical_tags,
             source_type=memory.source_type,
             importance_score=memory.importance_score,
             memory_type=memory.memory_type,
@@ -155,6 +251,22 @@ async def remember(memory: MemoryCreate):
             ttl_hours=memory.ttl_hours,
             domain=memory.domain
         )
+        
+        # Auto-extract and track skills (async, don't block on failure)
+        try:
+            skills = extract_skills_from_text(memory.content)
+            
+            # Track top 3 skills maximum per memory
+            for skill in skills[:3]:
+                await engine.track_learning(
+                    agent_id=memory.agent_name,
+                    skill=skill,
+                    memory_id=memory_id,
+                    notes=f"Auto-extracted from memory #{memory_id}"
+                )
+        except Exception as skill_error:
+            # Don't fail the whole request if skill tracking fails
+            print(f"⚠️ Skill tracking failed: {skill_error}")
         
         return RememberResponse(
             success=True,
@@ -173,7 +285,7 @@ async def recall(query: MemoryQuery):
     Example:
         {
           "query": "What did we build today?",
-          "agent_name": "Scar",
+          "agent_name": "example_agent",
           "max_layer": 2,
           "limit": 5
         }
@@ -198,7 +310,7 @@ async def recall(query: MemoryQuery):
 
 
 @app.get("/api/v1/stats", response_model=StatsResponse)
-async def get_stats(agent_name: str = "default"):
+async def get_stats(agent_name: str):
     """Get memory system statistics for an agent"""
     try:
         stats = await engine.get_stats(agent_name=agent_name)
@@ -208,7 +320,7 @@ async def get_stats(agent_name: str = "default"):
 
 
 @app.get("/api/v1/analytics")
-async def get_analytics(agent_name: str = "default"):
+async def get_analytics(agent_name: str):
     """
     Get detailed analytics about memory patterns
     
@@ -244,7 +356,7 @@ class ReviewDecision(BaseModel):
 
 
 @app.get("/api/v1/review/pending")
-async def get_pending_review(agent_name: str = "default", limit: int = 50):
+async def get_pending_review(agent_name: str, limit: int = 50):
     """
     Get memories that need review (expired or pending_review status)
     
@@ -325,6 +437,445 @@ async def review_decide(decision: ReviewDecision):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to execute decision: {str(e)}")
+
+
+# Hierarchical Memory Layer Endpoints (v0.2)
+
+class LayeredRecallRequest(BaseModel):
+    query: str
+    agent_name: str  # REQUIRED
+    start_layer: int = 1
+    max_layer: int = 3
+    limit_per_layer: int = 10
+    min_similarity: float = 0.7
+    stop_on_match: bool = True  # Stop drilling if high-confidence match found
+
+
+class LayerStatsResponse(BaseModel):
+    layer_1: int
+    layer_2: int
+    layer_3: int
+    layer_4: int
+    layer_5: int
+    total: int
+
+
+class CreateRelationshipRequest(BaseModel):
+    from_memory_id: int
+    to_memory_id: int
+    relationship_type: str
+    reason: Optional[str] = None
+
+
+class RelatedMemory(BaseModel):
+    memory: dict
+    relationship: dict
+
+
+@app.post("/api/v1/recall/layered")
+async def layered_recall(request: LayeredRecallRequest):
+    """
+    Smart hierarchical recall - starts with top layers, drills down as needed
+    
+    This mimics human memory: check critical memories first (Layer 1),
+    then recent context (Layer 2), and deeper layers only if needed.
+    
+    Example:
+    {
+      "query": "Who is Scarface?",
+      "start_layer": 1,
+      "max_layer": 3,
+      "stop_on_match": true
+    }
+    
+    Will search Layer 1 first, and only continue to Layer 2/3 if no good match found.
+    """
+    try:
+        results = []
+        layers_searched = []
+        
+        for layer in range(request.start_layer, request.max_layer + 1):
+            # Get memories from this layer
+            layer_results = await engine.recall_by_layer(
+                query=request.query,
+                agent_name=request.agent_name,
+                priority_layer=layer,
+                limit=request.limit_per_layer
+            )
+            
+            layers_searched.append(layer)
+            results.extend(layer_results)
+            
+            # Early stopping if we found high-confidence matches
+            if request.stop_on_match and any(r['similarity'] > 0.85 for r in layer_results):
+                break
+        
+        return {
+            "results": results,
+            "layers_searched": layers_searched,
+            "total_found": len(results)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Layered recall failed: {str(e)}")
+
+
+@app.get("/api/v1/stats/layers", response_model=LayerStatsResponse)
+async def layer_stats(agent_name: str):
+    """
+    Get memory distribution across priority layers
+    
+    Shows how memories are distributed for smart loading:
+    - Layer 1: Critical (identity, core)
+    - Layer 2: Recent context
+    - Layer 3: Knowledge base
+    - Layer 4: Historical
+    - Layer 5: Archive
+    """
+    try:
+        stats = await engine.get_layer_stats(agent_name=agent_name)
+        stats['total'] = sum([stats[f'layer_{i}'] for i in range(1, 6)])
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get layer stats: {str(e)}")
+
+
+@app.get("/api/v1/recovery/context")
+async def context_recovery(agent_name: str):
+    """
+    Generate context recovery payload for LLM restart
+    
+    Returns Layer 1 (critical) memories formatted for quick restoration:
+    - Identity (who am I?)
+    - Core relationships (who is Scarface?)
+    - Active projects
+    - Recent critical context
+    
+    This is the "wake up" endpoint - loads only what's essential.
+    """
+    try:
+        # Get Layer 1 memories
+        layer1 = await engine.recall_by_layer(
+            query="",  # No semantic filter, get all Layer 1
+            agent_name=agent_name,
+            priority_layer=1,
+            limit=100
+        )
+        
+        # Get layer stats for awareness
+        stats = await engine.get_layer_stats(agent_name=agent_name)
+        
+        recovery_payload = {
+            "critical_memories": layer1,
+            "memory_counts": stats,
+            "instructions": {
+                "loaded": "Layer 1 (critical identity)",
+                "available": f"Layer 2: {stats.get('layer_2', 0)} recent memories",
+                "available_deep": f"Layers 3-5: {stats.get('layer_3', 0) + stats.get('layer_4', 0) + stats.get('layer_5', 0)} historical/archived",
+                "next_steps": [
+                    "Read HEARTBEAT.md for current tasks",
+                    "Load Layer 2 if resuming active work",
+                    "Query deeper layers on-demand"
+                ]
+            }
+        }
+        
+        return recovery_payload
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Context recovery failed: {str(e)}")
+
+
+# Memory Relationship Endpoints
+
+@app.post("/api/v1/memory/relate")
+async def create_relationship(request: CreateRelationshipRequest):
+    """
+    Create explicit relationship between two memories
+    
+    Valid relationship types:
+    - superseded_by: Old memory is replaced by new one
+    - evolved_to: Memory evolved into another
+    - originated_from: Memory came from this source
+    - contradicts: Conflicting information
+    - reinforces: Supports/strengthens
+    - inspired_by: Was inspired by
+    - related_to: General association
+    
+    Example:
+    {
+      "from_memory_id": 42,
+      "to_memory_id": 50,
+      "relationship_type": "evolved_to",
+      "reason": "Project progressed to next phase"
+    }
+    """
+    try:
+        result = await engine.create_relationship(
+            from_memory_id=request.from_memory_id,
+            to_memory_id=request.to_memory_id,
+            relationship_type=request.relationship_type,
+            reason=request.reason
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create relationship: {str(e)}")
+
+
+@app.get("/api/v1/memory/{memory_id}/related", response_model=List[RelatedMemory])
+async def get_related_memories(
+    memory_id: int,
+    relationship_types: Optional[str] = None,  # Comma-separated
+    direction: str = "both",
+    limit: int = 20
+):
+    """
+    Get memories related to this one
+    
+    Args:
+    - memory_id: Central memory
+    - relationship_types: Comma-separated types (e.g., "evolved_to,inspired_by")
+    - direction: "both", "from" (outgoing), "to" (incoming)
+    - limit: Max results
+    
+    Example:
+    GET /api/v1/memory/42/related?relationship_types=evolved_to,inspired_by&direction=from
+    
+    Returns:
+    [
+      {
+        "memory": {
+          "id": 50,
+          "content": "...",
+          "tags": [...],
+          ...
+        },
+        "relationship": {
+          "id": 5,
+          "type": "evolved_to",
+          "reason": "Project progressed",
+          "direction": "outgoing"
+        }
+      }
+    ]
+    """
+    try:
+        types_list = relationship_types.split(',') if relationship_types else None
+        
+        results = await engine.get_related_memories(
+            memory_id=memory_id,
+            relationship_types=types_list,
+            direction=direction,
+            limit=limit
+        )
+        
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get related memories: {str(e)}")
+
+
+# ============================================================================
+# Learning Tracking Endpoints
+# ============================================================================
+
+@app.post("/api/v1/learning/track")
+async def track_learning(request: LearningTrackRequest):
+    """Track learning progress for a skill"""
+    try:
+        result = await engine.track_learning(
+            agent_id=request.agent_id,
+            skill=request.skill,
+            memory_id=request.memory_id,
+            notes=request.notes
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to track learning: {str(e)}")
+
+
+@app.get("/api/v1/learning/progress")
+async def get_learning_progress(
+    skill: str,
+    agent_id: str = "default"
+):
+    """Get learning progress for a specific skill"""
+    try:
+        progress = await engine.get_learning_progress(agent_id=agent_id, skill=skill)
+        if not progress:
+            raise HTTPException(status_code=404, detail=f"No progress found for skill: {skill}")
+        return progress
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get learning progress: {str(e)}")
+
+
+@app.get("/api/v1/learning/skills")
+async def list_skills(agent_id: str = "default"):
+    """List all skills being tracked"""
+    try:
+        skills = await engine.list_skills(agent_id=agent_id)
+        return skills
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list skills: {str(e)}")
+
+
+@app.get("/api/v1/learning/velocity")
+async def get_learning_velocity(
+    agent_id: str = "default",
+    days: int = 7
+):
+    """Get learning velocity (learnings per day)"""
+    try:
+        velocity = await engine.get_learning_velocity(agent_id=agent_id, days=days)
+        return velocity
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get learning velocity: {str(e)}")
+
+
+@app.get("/api/v1/tags/stats", response_model=TagStatsResponse)
+async def get_tag_stats():
+    """Get tag usage statistics"""
+    try:
+        async with engine.db_pool.acquire() as conn:
+            # Get basic stats
+            result = await conn.fetchrow("""
+                SELECT 
+                    COUNT(DISTINCT m.id) as memories_with_tags,
+                    COUNT(t.tag) as total_tags,
+                    COUNT(DISTINCT t.tag) as unique_tags
+                FROM memories m
+                CROSS JOIN LATERAL unnest(m.tags) as t(tag)
+                WHERE m.tags IS NOT NULL
+            """)
+            
+            # Top tags
+            top_tags_result = await conn.fetch("""
+                SELECT t.tag, COUNT(*) as count
+                FROM memories m
+                CROSS JOIN LATERAL unnest(m.tags) as t(tag)
+                WHERE m.tags IS NOT NULL
+                GROUP BY t.tag
+                ORDER BY count DESC
+                LIMIT 20
+            """)
+            
+            top_tags = [{"tag": row["tag"], "count": row["count"]} for row in top_tags_result]
+            
+            # Group tags by category
+            all_tags = [row["tag"] for row in top_tags_result]
+            tags_by_category = tag_system.group_tags_by_category(all_tags)
+            
+            return TagStatsResponse(
+                total_tags=result["total_tags"],
+                unique_tags=result["unique_tags"],
+                top_tags=top_tags,
+                tags_by_category=tags_by_category,
+                memories_with_tags=result["memories_with_tags"]
+            )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/tags/suggest", response_model=TagSuggestResponse)
+async def suggest_tags(request: TagSuggestRequest):
+    """Suggest tags based on content"""
+    try:
+        suggestions = tag_system.suggest_tags(
+            content=request.content,
+            existing_tags=request.existing_tags,
+            limit=request.limit
+        )
+        
+        # Group suggestions by category
+        categories = tag_system.group_tags_by_category(suggestions)
+        
+        return TagSuggestResponse(
+            suggestions=suggestions,
+            categories=categories
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/tags/canonicalize", response_model=TagCanonicalizeResponse)
+async def canonicalize_tags_endpoint(request: TagCanonicalizeRequest):
+    """Canonicalize tags (apply aliases and normalization)"""
+    try:
+        original = request.tags
+        canonical = tag_system.canonicalize_tags(original)
+        
+        # Find changes (before deduplication)
+        changes = []
+        individual_canonical = [tag_system.canonicalize_tag(t) for t in original]
+        for orig, canon in zip(original, individual_canonical):
+            if orig.lower() != canon:
+                changes.append({
+                    "original": orig,
+                    "canonical": canon,
+                    "reason": "alias" if orig.lower() in tag_system.ALIASES else "normalized"
+                })
+        
+        # Add note if deduplicated
+        if len(canonical) < len(individual_canonical):
+            dupes = len(individual_canonical) - len(canonical)
+            changes.append({
+                "original": "(duplicates)",
+                "canonical": "(removed)",
+                "reason": f"deduplicated {dupes} tag(s)"
+            })
+        
+        return TagCanonicalizeResponse(
+            original=original,
+            canonical=canonical,
+            changes=changes
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Identity Endpoints - Agent Personality & Self-Image
+# ============================================================================
+
+@app.get("/api/v1/identity/{agent_name}")
+async def get_identity(agent_name: str):
+    """
+    Get agent's identity and personality.
+    
+    Each agent is unique - same code, different experiences and self-image.
+    Like human twins: same DNA, different personalities.
+    """
+    try:
+        identity = load_identity(agent_name)
+        return {
+            "success": True,
+            "identity": identity.to_dict()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/whoami")
+async def whoami(agent_name: str):
+    """
+    Quick identity check - who am I?
+    
+    Returns basic identity info for an agent.
+    """
+    try:
+        identity = load_identity(agent_name)
+        return {
+            "name": identity.name,
+            "vibe": identity.vibe,
+            "created_at": identity.created_at.isoformat(),
+            "self_description": identity.self_description
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
