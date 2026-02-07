@@ -6,7 +6,7 @@ Multi-Layer Memory System for AI Agents
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import List, Optional, Set
 import uvicorn
 from contextlib import asynccontextmanager
@@ -16,6 +16,15 @@ import os
 from memory_engine import engine
 from tag_system import tag_system
 from identity import load_identity
+from validators import (
+    validate_agent_name,
+    validate_content,
+    validate_tags,
+    validate_importance,
+    validate_temporal_layer,
+    validate_domain,
+    ValidationError
+)
 
 # Configuration
 DEFAULT_AGENT_NAME = os.getenv("DEFAULT_AGENT_NAME", None)  # No default - must be explicit!
@@ -109,6 +118,51 @@ class MemoryCreate(BaseModel):
     temporal_layer: Optional[str] = "long"  # working | short | long | archive
     ttl_hours: Optional[float] = None  # Auto-expire for working memory (can be fractional)
     domain: Optional[str] = "general"  # self | user | projects | world | system | general
+    
+    # Validators
+    @validator('agent_name')
+    def validate_agent_name_field(cls, v):
+        try:
+            return validate_agent_name(v)
+        except ValidationError as e:
+            raise ValueError(str(e))
+    
+    @validator('content')
+    def validate_content_field(cls, v):
+        try:
+            return validate_content(v)
+        except ValidationError as e:
+            raise ValueError(str(e))
+    
+    @validator('tags')
+    def validate_tags_field(cls, v):
+        if v is None:
+            return []
+        try:
+            return validate_tags(v)
+        except ValidationError as e:
+            raise ValueError(str(e))
+    
+    @validator('importance_score')
+    def validate_importance_field(cls, v):
+        try:
+            return validate_importance(v)
+        except ValidationError as e:
+            raise ValueError(str(e))
+    
+    @validator('temporal_layer')
+    def validate_temporal_layer_field(cls, v):
+        try:
+            return validate_temporal_layer(v)
+        except ValidationError as e:
+            raise ValueError(str(e))
+    
+    @validator('domain')
+    def validate_domain_field(cls, v):
+        try:
+            return validate_domain(v)
+        except ValidationError as e:
+            raise ValueError(str(e))
 
 
 class MemoryQuery(BaseModel):
@@ -122,6 +176,46 @@ class MemoryQuery(BaseModel):
     temporal_layers: Optional[List[str]] = None  # Filter by temporal layer
     include_archive: bool = False  # Include archived memories
     domain: Optional[str] = None  # Filter by domain (self/user/projects/world/system)
+    
+    # Validators
+    @validator('agent_name')
+    def validate_agent_name_field(cls, v):
+        try:
+            return validate_agent_name(v)
+        except ValidationError as e:
+            raise ValueError(str(e))
+    
+    @validator('query')
+    def validate_query_field(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Query cannot be empty")
+        if len(v) > 1000:
+            raise ValueError("Query too long (max 1000 characters)")
+        return v.strip()
+    
+    @validator('limit')
+    def validate_limit_field(cls, v):
+        if not 1 <= v <= 100:
+            raise ValueError("Limit must be between 1 and 100")
+        return v
+    
+    @validator('tags')
+    def validate_tags_field(cls, v):
+        if v is None:
+            return None
+        try:
+            return validate_tags(v)
+        except ValidationError as e:
+            raise ValueError(str(e))
+    
+    @validator('domain')
+    def validate_domain_field(cls, v):
+        if v is None:
+            return None
+        try:
+            return validate_domain(v)
+        except ValidationError as e:
+            raise ValueError(str(e))
 
 
 class MemoryResponse(BaseModel):
