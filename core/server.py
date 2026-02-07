@@ -17,6 +17,7 @@ from memory_engine import engine
 from tag_system import tag_system
 from identity import load_identity
 from rate_limiter import rate_limit_middleware
+from auth import auth_middleware
 from validators import (
     validate_agent_name,
     validate_content,
@@ -100,7 +101,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware
+# CORS middleware (must be first for OPTIONS requests)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,  # Configured via ALLOWED_ORIGINS env variable
@@ -109,8 +110,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Rate limiting middleware
+# Authentication middleware (optional, env-controlled)
 from starlette.middleware.base import BaseHTTPMiddleware
+app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
+
+# Rate limiting middleware
 app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limit_middleware)
 
 # Pydantic models

@@ -7,138 +7,159 @@
 ## Quick Security Checklist
 
 ### Development (Local)
-- ✅ Default CORS allows all origins (`*`)
-- ✅ No authentication required
+- ✅ CORS: localhost only (default in .env.example)
+- ✅ Auth: Disabled by default (REQUIRE_AUTH=false)
+- ✅ Rate limiting: Enabled (60/min, 100 burst)
+- ✅ Input validation: All inputs sanitized
 - ✅ Runs on localhost:8080
 
 ### Production (Public)
-- ⚠️ **Configure CORS** - Restrict allowed origins
-- ⚠️ **Add authentication** - API key or OAuth
-- ⚠️ **Use HTTPS** - Encrypt all traffic
-- ⚠️ **Input validation** - Sanitize all inputs
-- ⚠️ **Rate limiting** - Prevent abuse
-- ⚠️ **Monitor logs** - Track suspicious activity
+- ✅ **Configure CORS** - Set ALLOWED_ORIGINS in .env (comma-separated)
+- ✅ **Add authentication** - Set REQUIRE_AUTH=true + API_KEY in .env
+- ⚠️ **Use HTTPS** - Encrypt all traffic (reverse proxy like nginx)
+- ✅ **Input validation** - Implemented (SQL injection protection)
+- ✅ **Rate limiting** - Implemented (token bucket, configurable)
+- ⚠️ **Monitor logs** - Track suspicious activity (TODO: structured logging)
 
 ---
 
-## CORS Configuration
+## CORS Configuration ✅ IMPLEMENTED
 
-### Current (Development)
-```python
-# core/server.py
-allow_origins=["*"]  # ⚠️ INSECURE - allows any website
-```
-
-### Production Configuration
-
-**Option 1: Environment Variable**
+### Environment Variable Configuration
 ```bash
-# .env
+# .env (default for development)
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
+
+# Production example
 ALLOWED_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
 ```
 
-**Option 2: Config File**
+### Current Implementation
 ```python
-# core/config.py
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
-
 # core/server.py
-from config import ALLOWED_ORIGINS
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=ALLOWED_ORIGINS,  # From environment
     allow_credentials=True,
-    allow_methods=["POST", "GET"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 ```
+
+**Default:** Falls back to `"*"` (allow all) if `ALLOWED_ORIGINS` not set.  
+**Recommended:** Set explicit origins in production!
 
 ---
 
 ## Authentication
 
-### API Key (Simple)
+### API Key (Simple) ✅ IMPLEMENTED
 
 **1. Generate key**
 ```bash
+# Using built-in generator
+python3 core/auth.py generate
+
+# Or manually
 python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
 **2. Add to .env**
 ```bash
-API_KEY=your-secret-key-here
 REQUIRE_AUTH=true
+API_KEY=your-generated-key-here
 ```
 
-**3. Implement middleware** (TODO - not yet implemented)
-```python
-from fastapi import Header, HTTPException
-
-async def verify_api_key(x_api_key: str = Header(...)):
-    if x_api_key != os.getenv("API_KEY"):
-        raise HTTPException(status_code=401, detail="Invalid API key")
+**3. Restart API**
+```bash
+bash restart_api.sh
 ```
 
 **4. Use in requests**
 ```bash
-curl -H "X-API-Key: your-secret-key-here" \
-  http://localhost:8080/api/v1/stats?agent_name=YourAgent
+curl -H "X-API-Key: your-generated-key-here" \
+  "http://localhost:8080/api/v1/whoami?agent_name=YourAgent"
 ```
+
+**Public endpoints** (no auth required):
+- `/` - Root
+- `/health` - Health check
+- `/docs` - API documentation
+- `/openapi.json` - OpenAPI spec
+- `/redoc` - ReDoc UI
+
+**Implementation:** See `core/auth.py` for the authentication middleware.
 
 ---
 
-## Input Validation
+## Input Validation ✅ IMPLEMENTED
 
 ### Current Status
-- ⚠️ Minimal validation
-- ⚠️ No SQL injection protection on agent_name
-- ⚠️ No length limits on content
+- ✅ SQL injection protection on all inputs
+- ✅ Agent name validation (alphanumeric + underscore/hyphen only)
+- ✅ Content length limits (max 50KB)
+- ✅ Tag validation (alphanumeric, max 50 chars each)
+- ✅ Numeric field range validation
 
-### Recommended
+### Implementation
 ```python
+# core/validators.py
 import re
-from pydantic import validator
+from typing import List
 
+def validate_agent_name(name: str) -> str:
+    """Validate agent name (SQL injection protection)"""
+    if not re.match(r'^[a-zA-Z0-9_-]+$', name):
+        raise ValidationError("Invalid characters in agent name")
+    if len(name) > 50:
+        raise ValidationError("Agent name too long (max 50)")
+    return name
+
+# Applied via Pydantic validators in server.py
 class MemoryCreate(BaseModel):
-    content: str
     agent_name: str
+    content: str
     
     @validator('agent_name')
-    def validate_agent_name(cls, v):
-        # Only alphanumeric, underscore, hyphen
-        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
-            raise ValueError('Invalid agent name format')
-        if len(v) > 50:
-            raise ValueError('Agent name too long')
-        return v
-    
-    @validator('content')
-    def validate_content(cls, v):
-        if len(v) > 10000:  # 10KB limit
-            raise ValueError('Content too long')
-        return v
+    def validate_name(cls, v):
+        return validate_agent_name(v)
 ```
+
+**See:** `core/validators.py` for all validation functions and `tests/test_validators.py` for test coverage.
 
 ---
 
-## Rate Limiting
+## Rate Limiting ✅ IMPLEMENTED
 
-**Not yet implemented** - Recommended for production:
+**Token bucket algorithm** with per-IP tracking.
 
-```python
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-@app.post("/api/v1/remember")
-@limiter.limit("10/minute")
-async def remember(request: Request, memory: MemoryCreate):
-    ...
+### Configuration (.env)
+```bash
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_PER_MINUTE=60    # Sustained rate
+RATE_LIMIT_BURST=100         # Burst capacity
 ```
+
+### How it works
+- **Sustained rate:** 60 requests per minute (1/second)
+- **Burst capacity:** 100 requests (allows bursts, then throttles)
+- **Per-IP tracking:** Each client has separate bucket
+- **Auto-cleanup:** Old buckets removed to prevent memory leaks
+
+### Response when limited
+```json
+{
+  "detail": "Rate limit exceeded. Please try again later.",
+  "limit": 60,
+  "window": "1 minute"
+}
+```
+HTTP Status: `429 Too Many Requests`
+
+**Implementation:** `core/rate_limiter.py` (token bucket) + middleware in `server.py`  
+**Tests:** `tests/test_rate_limiting.py`
 
 ---
 
