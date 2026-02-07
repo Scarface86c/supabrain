@@ -22,6 +22,7 @@ class MemoryEngine:
         self.model = None
         self.model_name = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
         self.device = os.getenv("DEVICE", "cpu")
+        self.default_agent_name = os.getenv("AGENT_NAME", "Scar")  # From config, not hardcoded!
         
     async def initialize(self):
         """Initialize database pool and embedding model"""
@@ -116,7 +117,7 @@ class MemoryEngine:
     async def remember(
         self,
         content: str,
-        agent_name: str = "default",
+        agent_name: Optional[str] = None,
         tags: Optional[List[str]] = None,
         source_type: Optional[str] = None,
         importance_score: float = 0.5,
@@ -127,10 +128,18 @@ class MemoryEngine:
     ) -> int:
         """
         Store a new memory
+        # Use configured agent name if not specified
+        if agent_name is None:
+            agent_name = self.default_agent_name
+        
         
         Returns:
             memory_id: ID of stored memory
         """
+        # Use configured agent name if not specified
+        if agent_name is None:
+            agent_name = self.default_agent_name
+            
         if tags is None:
             tags = []
         
@@ -206,7 +215,7 @@ class MemoryEngine:
     async def recall(
         self,
         query: str,
-        agent_name: str = "default",
+        agent_name: Optional[str] = None,
         max_layer: int = 2,
         limit: int = 10,
         min_score: float = 0.5,
@@ -218,6 +227,10 @@ class MemoryEngine:
     ) -> List[Dict]:
         """
         Search for memories matching query
+        # Use configured agent name if not specified
+        if agent_name is None:
+            agent_name = self.default_agent_name
+        
         
         Args:
             query: Search query
@@ -230,6 +243,10 @@ class MemoryEngine:
         Returns:
             List of matching memories with relevance scores
         """
+        # Use configured agent name if not specified
+        if agent_name is None:
+            agent_name = self.default_agent_name
+            
         # Generate query embedding
         query_emb = self._generate_embedding(query)
         query_emb_str = '[' + ','.join(map(str, query_emb.tolist())) + ']'
@@ -367,8 +384,12 @@ class MemoryEngine:
             
         return results
     
-    async def get_stats(self, agent_name: str = "default") -> Dict:
+    async def get_stats(self, agent_name: Optional[str] = None) -> Dict:
         """Get memory statistics for an agent"""
+        # Use configured agent name if not specified
+        if agent_name is None:
+            agent_name = self.default_agent_name
+            
         async with self.db_pool.acquire() as conn:
             agent_id = await conn.fetchval(
                 "SELECT id FROM agents WHERE agent_name = $1",
@@ -400,8 +421,12 @@ class MemoryEngine:
                 "total_accesses": stats['total_accesses'] or 0
             }
     
-    async def get_analytics(self, agent_name: str = "default") -> Dict:
+    async def get_analytics(self, agent_name: Optional[str] = None) -> Dict:
         """Get detailed analytics about memory patterns"""
+        # Use configured agent name if not specified
+        if agent_name is None:
+            agent_name = self.default_agent_name
+            
         async with self.db_pool.acquire() as conn:
             agent_id = await conn.fetchval(
                 "SELECT id FROM agents WHERE agent_name = $1",
@@ -504,11 +529,15 @@ class MemoryEngine:
     
     async def get_pending_review(
         self,
-        agent_name: str = "default",
+        agent_name: Optional[str] = None,
         limit: int = 50
     ) -> Dict:
         """
         Get memories that need review (expired or pending_review status)
+        # Use configured agent name if not specified
+        if agent_name is None:
+            agent_name = self.default_agent_name
+        
         
         Returns:
             Dictionary with pending_count and list of memories
@@ -714,6 +743,480 @@ class MemoryEngine:
                 "old_layer": old_layer,
                 "new_layer": new_layer,
                 "new_status": new_status
+            }
+
+    async def recall_by_layer(
+        self,
+        query: str,
+        agent_name: Optional[str] = None,
+        priority_layer: int = 1,
+        limit: int = 10
+    ) -> List[dict]:
+        """
+        Recall memories from specific priority layer
+        # Use configured agent name if not specified
+        if agent_name is None:
+            agent_name = self.default_agent_name
+        
+        
+        Args:
+            query: Search query (empty string returns all from layer)
+            agent_name: Agent identifier
+            priority_layer: Layer to search (1-5)
+            limit: Maximum results
+        
+        Returns:
+            List of memories with metadata
+        """
+        async with self.db_pool.acquire() as conn:
+            agent_id = await conn.fetchval(
+                "SELECT id FROM agents WHERE agent_name = $1",
+                agent_name
+            )
+            if not agent_id:
+                # Create agent if doesn't exist
+                agent_id = await conn.fetchval(
+                    "INSERT INTO agents (agent_name) VALUES ($1) RETURNING id",
+                    agent_name
+                )
+            
+            # If query is empty, return all from layer (for Layer 1 bulk load)
+            if not query.strip():
+                rows = await conn.fetch("""
+                    SELECT 
+                        id, 
+                        layer_1_summary as content,
+                        tags,
+                        importance_score,
+                        access_count,
+                        created_at,
+                        memory_type,
+                        temporal_layer,
+                        expires_at,
+                        domain,
+                        priority_layer
+                    FROM memories
+                    WHERE agent_id = $1
+                      AND priority_layer = $2
+                      AND status = 'active'
+                    ORDER BY importance_score DESC, created_at DESC
+                    LIMIT $3
+                """, agent_id, priority_layer, limit)
+                
+                results = []
+                for row in rows:
+                    results.append({
+                        "id": row['id'],
+                        "content": row['content'],
+                        "tags": row['tags'] or [],
+                        "importance_score": row['importance_score'],
+                        "access_count": row['access_count'],
+                        "created_at": row['created_at'].isoformat(),
+                        "memory_type": row['memory_type'],
+                        "temporal_layer": row['temporal_layer'],
+                        "expires_at": row['expires_at'].isoformat() if row['expires_at'] else None,
+                        "domain": row['domain'],
+                        "priority_layer": row['priority_layer'],
+                        "similarity": 1.0  # No semantic search, all from layer
+                    })
+                return results
+            
+            # Otherwise do semantic search within layer
+            query_embedding = self._generate_embedding(query)
+            query_emb_str = '[' + ','.join(map(str, query_embedding.tolist())) + ']'
+            
+            rows = await conn.fetch("""
+                SELECT 
+                    id,
+                    layer_1_summary as content,
+                    tags,
+                    importance_score,
+                    access_count,
+                    created_at,
+                    memory_type,
+                    temporal_layer,
+                    expires_at,
+                    domain,
+                    priority_layer,
+                    1 - (layer_1_embedding <=> $1::vector) as similarity
+                FROM memories
+                WHERE agent_id = $2
+                  AND priority_layer = $3
+                  AND status = 'active'
+                ORDER BY layer_1_embedding <=> $1::vector
+                LIMIT $4
+            """, query_emb_str, agent_id, priority_layer, limit)
+            
+            results = []
+            for row in rows:
+                results.append({
+                    "id": row['id'],
+                    "content": row['content'],
+                    "tags": row['tags'] or [],
+                    "importance_score": row['importance_score'],
+                    "access_count": row['access_count'],
+                    "created_at": row['created_at'].isoformat(),
+                    "memory_type": row['memory_type'],
+                    "temporal_layer": row['temporal_layer'],
+                    "expires_at": row['expires_at'].isoformat() if row['expires_at'] else None,
+                    "domain": row['domain'],
+                    "priority_layer": row['priority_layer'],
+                    "similarity": float(row['similarity'])
+                })
+            
+            return results
+    
+    async def create_relationship(
+        self,
+        from_memory_id: int,
+        to_memory_id: int,
+        relationship_type: str,
+        reason: str = None
+    ) -> dict:
+        """
+        Create explicit relationship between memories
+        
+        Args:
+            from_memory_id: Source memory
+            to_memory_id: Target memory
+            relationship_type: Type of relationship (see valid_relationship_type constraint)
+            reason: Optional explanation
+        
+        Returns:
+            Dict with relationship info
+        """
+        valid_types = [
+            'superseded_by', 'evolved_to', 'originated_from',
+            'contradicts', 'reinforces', 'inspired_by', 'related_to'
+        ]
+        
+        if relationship_type not in valid_types:
+            raise ValueError(f"Invalid relationship type. Must be one of: {valid_types}")
+        
+        async with self.db_pool.acquire() as conn:
+            # Check if both memories exist
+            from_exists = await conn.fetchval(
+                "SELECT EXISTS(SELECT 1 FROM memories WHERE id = $1)",
+                from_memory_id
+            )
+            to_exists = await conn.fetchval(
+                "SELECT EXISTS(SELECT 1 FROM memories WHERE id = $1)",
+                to_memory_id
+            )
+            
+            if not from_exists or not to_exists:
+                raise ValueError("One or both memories do not exist")
+            
+            # Create relationship (will ignore if duplicate due to unique constraint)
+            rel_id = await conn.fetchval("""
+                INSERT INTO memory_relationships 
+                (from_memory_id, to_memory_id, relationship_type, reason)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (from_memory_id, to_memory_id, relationship_type) 
+                DO UPDATE SET reason = EXCLUDED.reason
+                RETURNING id
+            """, from_memory_id, to_memory_id, relationship_type, reason)
+            
+            return {
+                "success": True,
+                "relationship_id": rel_id,
+                "from_memory_id": from_memory_id,
+                "to_memory_id": to_memory_id,
+                "relationship_type": relationship_type
+            }
+    
+    async def get_related_memories(
+        self,
+        memory_id: int,
+        relationship_types: List[str] = None,
+        direction: str = "both",  # "both", "from", "to"
+        limit: int = 20
+    ) -> List[dict]:
+        """
+        Get memories related to this one
+        
+        Args:
+            memory_id: Central memory
+            relationship_types: Filter by types (None = all)
+            direction: "both", "from" (outgoing), "to" (incoming)
+            limit: Max results
+        
+        Returns:
+            List of related memories with relationship info
+        """
+        async with self.db_pool.acquire() as conn:
+            # Build query based on direction
+            if direction == "from":
+                query = """
+                    SELECT 
+                        r.id as rel_id,
+                        r.relationship_type,
+                        r.reason,
+                        r.created_at as relationship_created,
+                        m.*
+                    FROM memory_relationships r
+                    JOIN memories m ON r.to_memory_id = m.id
+                    WHERE r.from_memory_id = $1
+                    AND m.status = 'active'
+                """
+            elif direction == "to":
+                query = """
+                    SELECT 
+                        r.id as rel_id,
+                        r.relationship_type,
+                        r.reason,
+                        r.created_at as relationship_created,
+                        m.*
+                    FROM memory_relationships r
+                    JOIN memories m ON r.from_memory_id = m.id
+                    WHERE r.to_memory_id = $1
+                    AND m.status = 'active'
+                """
+            else:  # both
+                query = """
+                    SELECT 
+                        r.id as rel_id,
+                        r.relationship_type,
+                        r.reason,
+                        r.created_at as relationship_created,
+                        'outgoing' as direction,
+                        m.*
+                    FROM memory_relationships r
+                    JOIN memories m ON r.to_memory_id = m.id
+                    WHERE r.from_memory_id = $1
+                    AND m.status = 'active'
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        r.id as rel_id,
+                        r.relationship_type,
+                        r.reason,
+                        r.created_at as relationship_created,
+                        'incoming' as direction,
+                        m.*
+                    FROM memory_relationships r
+                    JOIN memories m ON r.from_memory_id = m.id
+                    WHERE r.to_memory_id = $1
+                    AND m.status = 'active'
+                """
+            
+            # Add relationship type filter if specified
+            if relationship_types:
+                placeholders = ','.join([f"${i+2}" for i in range(len(relationship_types))])
+                query += f" AND r.relationship_type IN ({placeholders})"
+                query += f" LIMIT ${len(relationship_types) + 2}"
+                rows = await conn.fetch(query, memory_id, *relationship_types, limit)
+            else:
+                query += f" LIMIT $2"
+                rows = await conn.fetch(query, memory_id, limit)
+            
+            results = []
+            for row in rows:
+                results.append({
+                    "memory": {
+                        "id": row['id'],
+                        "content": row['layer_1_summary'],
+                        "tags": row['tags'] or [],
+                        "importance_score": row['importance_score'],
+                        "created_at": row['created_at'].isoformat(),
+                        "memory_type": row['memory_type'],
+                        "domain": row['domain']
+                    },
+                    "relationship": {
+                        "id": row['rel_id'],
+                        "type": row['relationship_type'],
+                        "reason": row['reason'],
+                        "created_at": row['relationship_created'].isoformat(),
+                        "direction": row.get('direction', 'outgoing' if direction == "from" else 'incoming')
+                    }
+                })
+            
+            return results
+    
+    async def get_layer_stats(self, agent_name: Optional[str] = None) -> dict:
+        """
+        Get memory count per priority layer
+        # Use configured agent name if not specified
+        if agent_name is None:
+            agent_name = self.default_agent_name
+        
+        
+        Returns:
+            Dict with layer_1 through layer_5 counts
+        """
+        async with self.db_pool.acquire() as conn:
+            agent_id = await conn.fetchval(
+                "SELECT id FROM agents WHERE agent_name = $1",
+                agent_name
+            )
+            if not agent_id:
+                # Return empty stats if agent doesn't exist
+                return {f"layer_{i}": 0 for i in range(1, 6)}
+            
+            rows = await conn.fetch("""
+                SELECT priority_layer, COUNT(*) as count
+                FROM memories
+                WHERE agent_id = $1 AND status = 'active'
+                GROUP BY priority_layer
+                ORDER BY priority_layer
+            """, agent_id)
+            
+            stats = {f"layer_{i}": 0 for i in range(1, 6)}
+            for row in rows:
+                stats[f"layer_{row['priority_layer']}"] = row['count']
+            
+            return stats
+
+
+    async def track_learning(self, agent_id: str, skill: str, memory_id: int = None, notes: str = None) -> dict:
+        """
+        Track learning progress for a skill
+        
+        Args:
+            agent_id: Agent identifier (e.g., "default")
+            skill: Skill name (e.g., "python", "fastapi")
+            memory_id: Optional memory ID this learning is associated with
+            notes: Optional notes about the learning
+        
+        Returns:
+            Dict with tracking result
+        """
+        async with self.db_pool.acquire() as conn:
+            # Check if skill already exists
+            existing = await conn.fetchrow("""
+                SELECT * FROM learning_progress
+                WHERE agent_id = $1 AND skill = $2
+            """, agent_id, skill)
+            
+            if existing:
+                # Update existing
+                await conn.execute("""
+                    UPDATE learning_progress
+                    SET last_practice = NOW(),
+                        memory_count = memory_count + 1,
+                        notes = COALESCE($3, notes),
+                        updated_at = NOW()
+                    WHERE agent_id = $1 AND skill = $2
+                """, agent_id, skill, notes)
+                
+                memory_count = existing['memory_count'] + 1
+            else:
+                # Insert new
+                await conn.execute("""
+                    INSERT INTO learning_progress 
+                    (agent_id, skill, memory_count, notes)
+                    VALUES ($1, $2, 1, $3)
+                """, agent_id, skill, notes)
+                
+                memory_count = 1
+            
+            # Calculate proficiency
+            if memory_count >= 50:
+                proficiency = "expert"
+            elif memory_count >= 21:
+                proficiency = "advanced"
+            elif memory_count >= 6:
+                proficiency = "intermediate"
+            else:
+                proficiency = "beginner"
+            
+            # Update proficiency
+            await conn.execute("""
+                UPDATE learning_progress
+                SET proficiency_level = $3
+                WHERE agent_id = $1 AND skill = $2
+            """, agent_id, skill, proficiency)
+            
+            return {
+                "success": True,
+                "skill": skill,
+                "memory_count": memory_count,
+                "proficiency_level": proficiency
+            }
+    
+    async def get_learning_progress(self, agent_id: str, skill: str) -> dict:
+        """Get learning progress for a specific skill"""
+        async with self.db_pool.acquire() as conn:
+            row = await conn.fetchrow("""
+                SELECT * FROM learning_progress
+                WHERE agent_id = $1 AND skill = $2
+            """, agent_id, skill)
+            
+            if not row:
+                return None
+            
+            # Calculate days learning
+            days_learning = (row['last_practice'] - row['first_encounter']).days
+            
+            return {
+                "skill": row['skill'],
+                "proficiency_level": row['proficiency_level'],
+                "memory_count": row['memory_count'],
+                "first_encounter": row['first_encounter'].isoformat(),
+                "last_practice": row['last_practice'].isoformat(),
+                "days_learning": days_learning,
+                "notes": row['notes']
+            }
+    
+    async def list_skills(self, agent_id: str) -> dict:
+        """List all skills being tracked"""
+        async with self.db_pool.acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT skill, proficiency_level, memory_count, last_practice
+                FROM learning_progress
+                WHERE agent_id = $1
+                ORDER BY last_practice DESC
+            """, agent_id)
+            
+            skills = []
+            by_proficiency = {"expert": 0, "advanced": 0, "intermediate": 0, "beginner": 0}
+            
+            for row in rows:
+                skills.append({
+                    "skill": row['skill'],
+                    "proficiency": row['proficiency_level'],
+                    "memory_count": row['memory_count'],
+                    "last_practice": row['last_practice'].isoformat()
+                })
+                by_proficiency[row['proficiency_level']] += 1
+            
+            return {
+                "skills": skills,
+                "total_skills": len(skills),
+                "by_proficiency": by_proficiency
+            }
+    
+    async def get_learning_velocity(self, agent_id: str, days: int = 7) -> dict:
+        """Get learning velocity (skills learned/practiced in time period)"""
+        async with self.db_pool.acquire() as conn:
+            # Skills with activity in the period
+            rows = await conn.fetch("""
+                SELECT skill, memory_count
+                FROM learning_progress
+                WHERE agent_id = $1 
+                  AND last_practice >= NOW() - $2 * INTERVAL '1 day'
+                ORDER BY last_practice DESC
+            """, agent_id, days)
+            
+            # New skills (first encounter in period)
+            new_skills_count = await conn.fetchval("""
+                SELECT COUNT(*)
+                FROM learning_progress
+                WHERE agent_id = $1
+                  AND first_encounter >= NOW() - $2 * INTERVAL '1 day'
+            """, agent_id, days)
+            
+            trending_skills = [row['skill'] for row in rows[:5]]  # Top 5
+            total_learnings = sum(row['memory_count'] for row in rows)
+            
+            return {
+                "period_days": days,
+                "new_skills": new_skills_count,
+                "skills_practiced": len(rows),
+                "total_learnings": total_learnings,
+                "velocity": round(total_learnings / days, 2) if days > 0 else 0,
+                "trending_skills": trending_skills
             }
 
 

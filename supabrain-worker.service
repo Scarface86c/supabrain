@@ -7,7 +7,7 @@ After=network.target postgresql.service
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/supabrain/core
-ExecStart=/usr/bin/python3 /home/ubuntu/supabrain/core/supabrain_worker.py
+ExecStart=/usr/bin/python3 /home/ubuntu/supabrain/core/supabrain_worker_openclaw.py
 Restart=always
 RestartSec=10
 

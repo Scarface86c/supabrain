@@ -18,7 +18,7 @@ echo
 
 # 1. Worker Status
 echo -e "${BLUE}1. Worker Status${NC}"
-WORKER_PID=$(ps aux | grep "[p]ython.*supabrain_worker" | awk '{print $2}')
+WORKER_PID=$(ps aux | grep "[p]ython.*supabrain_worker_openclaw" | awk '{print $2}')
 if [ -n "$WORKER_PID" ]; then
     echo -e "   ${GREEN}✅ Running${NC} (PID: $WORKER_PID)"
     
@@ -91,9 +91,9 @@ echo
 
 # 4. Recent Logs
 echo -e "${BLUE}4. Recent Logs${NC}"
-if [ -f "/tmp/supabrain_worker_pg.log" ]; then
+if [ -f "/tmp/supabrain_worker_openclaw.log" ]; then
     echo "   Last 5 lines:"
-    tail -5 /tmp/supabrain_worker_pg.log | sed 's/^/      /'
+    tail -5 /tmp/supabrain_worker_openclaw.log | sed 's/^/      /'
 else
     echo -e "   ${YELLOW}⚠️  No log file${NC}"
 fi
@@ -141,8 +141,8 @@ fi
 echo
 
 echo "Commands:"
-echo "  Start worker:  cd ~/supabrain/core && nohup python3 -u supabrain_worker.py > /tmp/supabrain_worker_pg.log 2>&1 &"
+echo "  Start worker:  cd ~/supabrain/core && nohup python3 -u supabrain_worker_openclaw.py > /tmp/supabrain_worker_openclaw.log 2>&1 &"
 echo "  Stop worker:   pkill -f supabrain_worker"
-echo "  View logs:     tail -f /tmp/supabrain_worker_pg.log"
+echo "  View logs:     tail -f /tmp/supabrain_worker_openclaw.log"
 echo "  Add thought:   python3 ~/.openclaw/workspace/think_cycle_prototype.py add \"Topic\" \"high\" \"Context\""
 echo

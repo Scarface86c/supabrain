@@ -33,19 +33,38 @@ The setup script will:
 
 ## Post-Install Configuration
 
-### 1. Set Anthropic API Key (Required for LLM Features)
+### 1. Configure LLM Backend (Required for LLM Features)
 
-**Get your API key:** https://console.anthropic.com/
+**Recommended: Use OpenClaw Integration (Max Account!)**
+
+This routes LLM calls through OpenClaw, using your existing Max Account automatically!
+
+```bash
+# Create worker agent (one-time setup)
+openclaw agents add worker --workspace ~/supabrain/worker-agent --non-interactive
+
+# Edit .env
+nano ~/supabrain/.env
+
+# Set OpenClaw mode:
+USE_OPENCLAW=true
+OPENCLAW_AGENT=worker
+```
+
+**Alternative: Direct Anthropic API**
+
+If you have a separate Anthropic account with credits:
 
 ```bash
 # Edit .env
 nano ~/supabrain/.env
 
-# Add your key:
+# Disable OpenClaw, set API key:
+USE_OPENCLAW=false
 ANTHROPIC_API_KEY=sk-ant-api03-YOUR_KEY_HERE
 ```
 
-**Without API key:**
+**Without LLM backend:**
 - ✅ Memory storage works
 - ✅ Auto-capture works
 - ❌ Sleep cycle (LLM consolidation) won't work
@@ -69,7 +88,7 @@ psql postgresql://postgres:supabrain2024@localhost:5432/supabrain -c "SELECT 1"
 
 ```bash
 cd ~/supabrain/core
-nohup python3 -u supabrain_worker.py > /tmp/supabrain_worker.log 2>&1 &
+nohup python3 -u supabrain_worker_openclaw.py > /tmp/supabrain_worker.log 2>&1 &
 
 # Check status
 tail -f /tmp/supabrain_worker.log
