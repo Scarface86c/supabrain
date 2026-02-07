@@ -28,6 +28,7 @@ from validators import (
 
 # Configuration
 DEFAULT_AGENT_NAME = os.getenv("DEFAULT_AGENT_NAME", None)  # No default - must be explicit!
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")  # Comma-separated list from env
 
 
 # Skill extraction patterns
@@ -101,7 +102,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure properly in production
+    allow_origins=ALLOWED_ORIGINS,  # Configured via ALLOWED_ORIGINS env variable
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
