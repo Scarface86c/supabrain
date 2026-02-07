@@ -18,6 +18,7 @@ from tag_system import tag_system
 from identity import load_identity
 from rate_limiter import rate_limit_middleware
 from auth import auth_middleware
+from utils.skill_extraction import extract_skills_from_text
 from validators import (
     validate_agent_name,
     validate_content,
