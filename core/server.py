@@ -29,6 +29,9 @@ from validators import (
     ValidationError
 )
 
+# Import routers
+from routes import health, memory
+
 # Configuration
 DEFAULT_AGENT_NAME = os.getenv("DEFAULT_AGENT_NAME", None)  # No default - must be explicit!
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")  # Comma-separated list from env
@@ -117,6 +120,10 @@ app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
 
 # Rate limiting middleware
 app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limit_middleware)
+
+# Include routers
+app.include_router(health.router)
+app.include_router(memory.router)
 
 # Pydantic models
 class MemoryCreate(BaseModel):

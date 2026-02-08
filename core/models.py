@@ -156,3 +156,55 @@ class TagSuggestRequest(BaseModel):
 
 class TagCanonicalizeRequest(BaseModel):
     tags: List[str]
+
+
+# Response Models
+class MemoryResponse(BaseModel):
+    id: int
+    content: str
+    tags: List[str]
+    importance_score: float
+    access_count: int
+    similarity: float
+    base_similarity: Optional[float] = None
+
+
+class RememberResponse(BaseModel):
+    success: bool
+    message: str
+    memory_id: int
+
+
+class StatsResponse(BaseModel):
+    total_memories: int
+    average_importance: float
+    total_accesses: int
+
+
+class TagStatsResponse(BaseModel):
+    """Tag statistics response"""
+    total_tags: int
+    unique_tags: int
+    top_tags: List[dict]
+    tags_by_category: dict
+    memories_with_tags: int
+
+
+class TagSuggestResponse(BaseModel):
+    """Tag suggestion response"""
+    suggestions: List[str]
+    categories: dict
+
+
+class TagCanonicalizeResponse(BaseModel):
+    """Tag canonicalization response"""
+    original_tags: List[str]
+    canonical_tags: List[str]
+    aliases_applied: dict
+
+
+class LearningTrackRequest(BaseModel):
+    skill: str
+    agent_id: str = "default"
+    memory_id: Optional[int] = None
+    notes: Optional[str] = None

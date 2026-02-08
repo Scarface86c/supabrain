@@ -28,14 +28,18 @@ async def health_check():
     
     # Check database connectivity
     try:
-        # Simple query to verify connection
-        result = await engine.pool.fetch("SELECT 1")
-        db_status = "connected"
+        if engine.db_pool:
+            # Simple DB check
+            async with engine.db_pool.acquire() as conn:
+                await conn.fetchval("SELECT 1")
+            db_status = "connected"
+        else:
+            db_status = "not connected"
     except Exception as e:
         db_status = f"error: {str(e)}"
     
     return {
         "status": "healthy" if db_status == "connected" else "degraded",
         "database": db_status,
-        "model": engine.model_name
+        "model": engine.model_name if engine.model else "not loaded"
     }
