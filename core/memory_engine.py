@@ -48,6 +48,23 @@ class MemoryEngine:
         """Generate embedding vector for text"""
         return self.model.encode(text, convert_to_numpy=True)
     
+    async def _get_agent_id(self, agent_name: str, conn) -> Optional[int]:
+        """
+        Get agent ID by name (case-insensitive lookup)
+        
+        Args:
+            agent_name: Agent name (case doesn't matter)
+            conn: Database connection
+            
+        Returns:
+            Agent ID or None if not found
+        """
+        agent_id = await conn.fetchval(
+            "SELECT id FROM agents WHERE LOWER(agent_name) = LOWER($1)",
+            agent_name
+        )
+        return agent_id
+    
     def _auto_layer_content(self, content: str) -> Dict[str, str]:
         """
         Automatically create multi-layer representation
@@ -252,11 +269,8 @@ class MemoryEngine:
         query_emb_str = '[' + ','.join(map(str, query_emb.tolist())) + ']'
         
         async with self.db_pool.acquire() as conn:
-            # Get agent ID
-            agent_id = await conn.fetchval(
-                "SELECT id FROM agents WHERE agent_name = $1",
-                agent_name
-            )
+            # Get agent ID (case-insensitive)
+            agent_id = await self._get_agent_id(agent_name, conn)
             
             if not agent_id:
                 return []
@@ -391,10 +405,7 @@ class MemoryEngine:
             agent_name = self.default_agent_name
             
         async with self.db_pool.acquire() as conn:
-            agent_id = await conn.fetchval(
-                "SELECT id FROM agents WHERE agent_name = $1",
-                agent_name
-            )
+            agent_id = await self._get_agent_id(agent_name, conn)
             
             if not agent_id:
                 return {
@@ -428,10 +439,7 @@ class MemoryEngine:
             agent_name = self.default_agent_name
             
         async with self.db_pool.acquire() as conn:
-            agent_id = await conn.fetchval(
-                "SELECT id FROM agents WHERE agent_name = $1",
-                agent_name
-            )
+            agent_id = await self._get_agent_id(agent_name, conn)
             
             if not agent_id:
                 return {"error": "Agent not found"}
@@ -543,11 +551,8 @@ class MemoryEngine:
             Dictionary with pending_count and list of memories
         """
         async with self.db_pool.acquire() as conn:
-            # Get agent ID
-            agent_id = await conn.fetchval(
-                "SELECT id FROM agents WHERE agent_name = $1",
-                agent_name
-            )
+            # Get agent ID (case-insensitive)
+            agent_id = await self._get_agent_id(agent_name, conn)
             
             if not agent_id:
                 return {"pending_count": 0, "memories": []}
@@ -769,10 +774,7 @@ class MemoryEngine:
             List of memories with metadata
         """
         async with self.db_pool.acquire() as conn:
-            agent_id = await conn.fetchval(
-                "SELECT id FROM agents WHERE agent_name = $1",
-                agent_name
-            )
+            agent_id = await self._get_agent_id(agent_name, conn)
             if not agent_id:
                 # Create agent if doesn't exist
                 agent_id = await conn.fetchval(
@@ -1046,10 +1048,7 @@ class MemoryEngine:
             Dict with layer_1 through layer_5 counts
         """
         async with self.db_pool.acquire() as conn:
-            agent_id = await conn.fetchval(
-                "SELECT id FROM agents WHERE agent_name = $1",
-                agent_name
-            )
+            agent_id = await self._get_agent_id(agent_name, conn)
             if not agent_id:
                 # Return empty stats if agent doesn't exist
                 return {f"layer_{i}": 0 for i in range(1, 6)}
