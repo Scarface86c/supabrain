@@ -229,3 +229,11 @@ class LayerStatsResponse(BaseModel):
     layer_4: int
     layer_5: int
     total: int
+
+
+class ReviewDecision(BaseModel):
+    memory_id: int
+    decision: str  # promote | extend | archive | delete
+    new_layer: Optional[str] = None
+    reason: Optional[str] = None
+    ttl_hours: Optional[float] = None
