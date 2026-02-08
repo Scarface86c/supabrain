@@ -30,7 +30,7 @@ from validators import (
 )
 
 # Import routers
-from routes import health, memory
+from routes import health, memory, stats
 
 # Configuration
 DEFAULT_AGENT_NAME = os.getenv("DEFAULT_AGENT_NAME", None)  # No default - must be explicit!
@@ -124,6 +124,7 @@ app.add_middleware(BaseHTTPMiddleware, dispatch=rate_limit_middleware)
 # Include routers
 app.include_router(health.router)
 app.include_router(memory.router)
+app.include_router(stats.router)
 
 # Pydantic models
 class MemoryCreate(BaseModel):
