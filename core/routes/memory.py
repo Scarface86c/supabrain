@@ -3,8 +3,16 @@ Memory CRUD and recall endpoints
 """
 
 from fastapi import APIRouter, HTTPException
-from typing import List
-from models import MemoryCreate, MemoryQuery, MemoryResponse, RememberResponse
+from typing import List, Optional
+from models import (
+    MemoryCreate, 
+    MemoryQuery, 
+    MemoryResponse, 
+    RememberResponse,
+    LayeredRecallQuery,
+    CreateRelationshipRequest,
+    RelatedMemory
+)
 from memory_engine import engine
 from tag_system import tag_system
 from utils.skill_extraction import extract_skills_from_text
@@ -98,8 +106,144 @@ async def recall(query: MemoryQuery):
         raise HTTPException(status_code=500, detail=f"Failed to recall memories: {str(e)}")
 
 
-# Other endpoints to migrate:
-# DELETE /api/v1/memory/{memory_id}
-# POST /api/v1/memory/relate
-# GET /api/v1/memory/{memory_id}/related
-# POST /api/v1/recall/layered
+@router.post("/recall/layered")
+async def layered_recall(request: LayeredRecallQuery):
+    """
+    Smart hierarchical recall - starts with top layers, drills down as needed
+    
+    This mimics human memory: check critical memories first (Layer 1),
+    then recent context (Layer 2), and deeper layers only if needed.
+    
+    Example:
+    {
+      "query": "Who is Scarface?",
+      "agent_name": "Scar",
+      "start_layer": 1,
+      "max_layer": 3,
+      "stop_on_match": true
+    }
+    
+    Will search Layer 1 first, and only continue to Layer 2/3 if no good match found.
+    """
+    try:
+        results = []
+        layers_searched = []
+        
+        for layer in range(request.start_layer, request.max_layer + 1):
+            # Get memories from this layer
+            layer_results = await engine.recall_by_layer(
+                query=request.query,
+                agent_name=request.agent_name,
+                priority_layer=layer,
+                limit=request.limit_per_layer
+            )
+            
+            layers_searched.append(layer)
+            results.extend(layer_results)
+            
+            # Early stopping if we found high-confidence matches
+            if request.stop_on_match and any(r['similarity'] > 0.85 for r in layer_results):
+                break
+        
+        return {
+            "results": results,
+            "layers_searched": layers_searched,
+            "total_found": len(results)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Layered recall failed: {str(e)}")
+
+
+@router.delete("/memory/{memory_id}")
+async def delete_memory(memory_id: int):
+    """Delete a specific memory (TODO: implement)"""
+    # TODO: Implement deletion
+    raise HTTPException(status_code=501, detail="Not implemented yet")
+
+
+@router.post("/memory/relate")
+async def create_relationship(request: CreateRelationshipRequest):
+    """
+    Create explicit relationship between two memories
+    
+    Valid relationship types:
+    - superseded_by: Old memory is replaced by new one
+    - evolved_to: Memory evolved into another
+    - originated_from: Memory came from this source
+    - contradicts: Conflicting information
+    - reinforces: Supports/strengthens
+    - inspired_by: Was inspired by
+    - related_to: General association
+    
+    Example:
+    {
+      "from_memory_id": 42,
+      "to_memory_id": 50,
+      "relationship_type": "evolved_to",
+      "reason": "Project progressed to next phase"
+    }
+    """
+    try:
+        result = await engine.create_relationship(
+            from_memory_id=request.from_memory_id,
+            to_memory_id=request.to_memory_id,
+            relationship_type=request.relationship_type,
+            reason=request.reason
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create relationship: {str(e)}")
+
+
+@router.get("/memory/{memory_id}/related", response_model=List[RelatedMemory])
+async def get_related_memories(
+    memory_id: int,
+    relationship_types: Optional[str] = None,  # Comma-separated
+    direction: str = "both",
+    limit: int = 20
+):
+    """
+    Get memories related to this one
+    
+    Args:
+    - memory_id: Central memory
+    - relationship_types: Comma-separated types (e.g., "evolved_to,inspired_by")
+    - direction: "both", "from" (outgoing), "to" (incoming)
+    - limit: Max results
+    
+    Example:
+    GET /api/v1/memory/42/related?relationship_types=evolved_to,inspired_by&direction=from
+    
+    Returns:
+    [
+      {
+        "memory": {
+          "id": 50,
+          "content": "...",
+          ...
+        },
+        "relationship": {
+          "type": "evolved_to",
+          "reason": "...",
+          "created_at": "..."
+        }
+      }
+    ]
+    """
+    try:
+        # Parse relationship types
+        rel_types = None
+        if relationship_types:
+            rel_types = [t.strip() for t in relationship_types.split(",")]
+        
+        results = await engine.get_related_memories(
+            memory_id=memory_id,
+            relationship_types=rel_types,
+            direction=direction,
+            limit=limit
+        )
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get related memories: {str(e)}")

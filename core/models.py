@@ -208,3 +208,24 @@ class LearningTrackRequest(BaseModel):
     agent_id: str = "default"
     memory_id: Optional[int] = None
     notes: Optional[str] = None
+
+
+class CreateRelationshipRequest(BaseModel):
+    from_memory_id: int
+    to_memory_id: int
+    relationship_type: str
+    reason: Optional[str] = None
+
+
+class RelatedMemory(BaseModel):
+    memory: dict
+    relationship: dict
+
+
+class LayerStatsResponse(BaseModel):
+    layer_1: int
+    layer_2: int
+    layer_3: int
+    layer_4: int
+    layer_5: int
+    total: int
