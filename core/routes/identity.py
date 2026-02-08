@@ -22,8 +22,11 @@ async def get_identity(agent_name: str):
             "success": True,
             "identity": identity.to_dict()
         }
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=f"Identity not found: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"❌ Unexpected error in get_identity: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load identity")
 
 
 @router.get("/whoami")
@@ -41,5 +44,8 @@ async def whoami(agent_name: str):
             "created_at": identity.created_at.isoformat(),
             "self_description": identity.self_description
         }
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=f"Identity not found: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"❌ Unexpected error in whoami: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load identity")

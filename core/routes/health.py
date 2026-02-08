@@ -35,8 +35,12 @@ async def health_check():
             db_status = "connected"
         else:
             db_status = "not connected"
+    except ConnectionError as e:
+        db_status = "connection_failed"
+        print(f"❌ Database connection error in health check: {e}")
     except Exception as e:
-        db_status = f"error: {str(e)}"
+        db_status = f"error: {str(e)[:50]}"  # Truncate error message
+        print(f"❌ Unexpected error in health check: {e}")
     
     return {
         "status": "healthy" if db_status == "connected" else "degraded",

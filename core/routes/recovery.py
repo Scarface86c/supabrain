@@ -49,5 +49,8 @@ async def context_recovery(agent_name: str):
         }
         
         return recovery_payload
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail="Database connection failed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Context recovery failed: {str(e)}")
+        print(f"❌ Unexpected error in context_recovery: {e}")
+        raise HTTPException(status_code=500, detail="Context recovery failed")
