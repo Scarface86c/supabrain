@@ -198,9 +198,9 @@ class TagSuggestResponse(BaseModel):
 
 class TagCanonicalizeResponse(BaseModel):
     """Tag canonicalization response"""
-    original_tags: List[str]
-    canonical_tags: List[str]
-    aliases_applied: dict
+    original: List[str]
+    canonical: List[str]
+    changes: List[dict]
 
 
 class LearningTrackRequest(BaseModel):
