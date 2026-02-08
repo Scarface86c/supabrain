@@ -41,8 +41,11 @@ async def get_pending_review(agent_name: str, limit: int = 50):
     try:
         result = await engine.get_pending_review(agent_name=agent_name, limit=limit)
         return result
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail="Database connection failed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get pending reviews: {str(e)}")
+        print(f"❌ Unexpected error in get_pending_review: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get pending reviews")
 
 
 @router.post("/decide")
@@ -89,5 +92,8 @@ async def review_decide(decision: ReviewDecision):
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail="Database connection failed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to execute decision: {str(e)}")
+        print(f"❌ Unexpected error in review_decide: {e}")
+        raise HTTPException(status_code=500, detail="Failed to execute decision")

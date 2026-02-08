@@ -73,8 +73,11 @@ async def suggest_tags(request: TagSuggestRequest):
             categories=categories
         )
         
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid tag suggestion request: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"❌ Unexpected error in suggest_tags: {e}")
+        raise HTTPException(status_code=500, detail="Failed to suggest tags")
 
 
 @router.post("/canonicalize", response_model=TagCanonicalizeResponse)
@@ -110,5 +113,8 @@ async def canonicalize_tags_endpoint(request: TagCanonicalizeRequest):
             changes=changes
         )
         
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid canonicalization request: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"❌ Unexpected error in canonicalize_tags: {e}")
+        raise HTTPException(status_code=500, detail="Failed to canonicalize tags")
