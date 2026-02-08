@@ -63,17 +63,26 @@ async def remember(memory: MemoryCreate):
                     memory_id=memory_id,
                     notes=f"Auto-extracted from memory #{memory_id}"
                 )
-        except Exception as skill_error:
+        except (ValueError, TypeError) as skill_error:
             # Don't fail the whole request if skill tracking fails
-            print(f"⚠️ Skill tracking failed: {skill_error}")
+            print(f"⚠️ Skill tracking failed (validation error): {skill_error}")
+        except Exception as skill_error:
+            # Unexpected error - log but don't break remember
+            print(f"⚠️ Unexpected skill tracking error: {skill_error}")
         
         return RememberResponse(
             success=True,
             message="Memory stored successfully",
             memory_id=memory_id
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid memory data: {str(e)}")
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail="Database connection failed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to store memory: {str(e)}")
+        # Unexpected error - log and return generic 500
+        print(f"❌ Unexpected error in remember: {e}")
+        raise HTTPException(status_code=500, detail="Failed to store memory")
 
 
 @router.post("/recall", response_model=List[MemoryResponse])
@@ -102,8 +111,13 @@ async def recall(query: MemoryQuery):
             include_archive=query.include_archive
         )
         return results
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid query parameters: {str(e)}")
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail="Database connection failed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to recall memories: {str(e)}")
+        print(f"❌ Unexpected error in recall: {e}")
+        raise HTTPException(status_code=500, detail="Failed to recall memories")
 
 
 @router.post("/recall/layered")
@@ -150,8 +164,13 @@ async def layered_recall(request: LayeredRecallQuery):
             "layers_searched": layers_searched,
             "total_found": len(results)
         }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid layer parameters: {str(e)}")
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail="Database connection failed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Layered recall failed: {str(e)}")
+        print(f"❌ Unexpected error in layered_recall: {e}")
+        raise HTTPException(status_code=500, detail="Layered recall failed")
 
 
 @router.delete("/memory/{memory_id}")
@@ -193,8 +212,11 @@ async def create_relationship(request: CreateRelationshipRequest):
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail="Database connection failed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create relationship: {str(e)}")
+        print(f"❌ Unexpected error in create_relationship: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create relationship")
 
 
 @router.get("/memory/{memory_id}/related", response_model=List[RelatedMemory])
@@ -245,5 +267,10 @@ async def get_related_memories(
             limit=limit
         )
         return results
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid relationship query: {str(e)}")
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail="Database connection failed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get related memories: {str(e)}")
+        print(f"❌ Unexpected error in get_related_memories: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get related memories")
