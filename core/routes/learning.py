@@ -20,8 +20,13 @@ async def track_learning(request: LearningTrackRequest):
             notes=request.notes
         )
         return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid learning data: {str(e)}")
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail="Database connection failed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to track learning: {str(e)}")
+        print(f"❌ Unexpected error in track_learning: {e}")
+        raise HTTPException(status_code=500, detail="Failed to track learning")
 
 
 @router.get("/progress")
@@ -37,8 +42,11 @@ async def get_learning_progress(
         return progress
     except HTTPException:
         raise
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail="Database connection failed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get learning progress: {str(e)}")
+        print(f"❌ Unexpected error in get_learning_progress: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get learning progress")
 
 
 @router.get("/skills")
@@ -47,8 +55,11 @@ async def list_skills(agent_id: str = "default"):
     try:
         skills = await engine.list_skills(agent_id=agent_id)
         return skills
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail="Database connection failed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to list skills: {str(e)}")
+        print(f"❌ Unexpected error in list_skills: {e}")
+        raise HTTPException(status_code=500, detail="Failed to list skills")
 
 
 @router.get("/velocity")
@@ -60,5 +71,8 @@ async def get_learning_velocity(
     try:
         velocity = await engine.get_learning_velocity(agent_id=agent_id, days=days)
         return velocity
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail="Database connection failed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get learning velocity: {str(e)}")
+        print(f"❌ Unexpected error in get_learning_velocity: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get learning velocity")

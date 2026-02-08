@@ -15,8 +15,11 @@ async def get_stats(agent_name: str):
     try:
         stats = await engine.get_stats(agent_name=agent_name)
         return StatsResponse(**stats)
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail="Database connection failed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
+        print(f"❌ Unexpected error in get_stats: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get stats")
 
 
 @router.get("/analytics")
@@ -35,8 +38,11 @@ async def get_analytics(agent_name: str):
     try:
         analytics = await engine.get_analytics(agent_name=agent_name)
         return analytics
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail="Database connection failed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get analytics: {str(e)}")
+        print(f"❌ Unexpected error in get_analytics: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get analytics")
 
 
 @router.get("/stats/layers", response_model=LayerStatsResponse)
@@ -55,5 +61,8 @@ async def layer_stats(agent_name: str):
         stats = await engine.get_layer_stats(agent_name=agent_name)
         stats['total'] = sum([stats[f'layer_{i}'] for i in range(1, 6)])
         return stats
+    except ConnectionError as e:
+        raise HTTPException(status_code=503, detail="Database connection failed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get layer stats: {str(e)}")
+        print(f"❌ Unexpected error in get_layer_stats: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get layer stats")
