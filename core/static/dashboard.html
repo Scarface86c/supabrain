@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SupaStats Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0a0e1a;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: #1a1f35;
+            padding: 25px;
+            border-radius: 10px;
+            border: 1px solid #2a3550;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-bottom: 10px;
+        }
+        
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-card {
+            background: #1a1f35;
+            padding: 25px;
+            border-radius: 10px;
+            border: 1px solid #2a3550;
+        }
+        
+        .chart-title {
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            color: #ffffff;
+        }
+        
+        .memories-list {
+            background: #1a1f35;
+            padding: 25px;
+            border-radius: 10px;
+            border: 1px solid #2a3550;
+        }
+        
+        .memory-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #0f1424;
+            border-radius: 5px;
+            border-left: 3px solid #667eea;
+        }
+        
+        .memory-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .memory-id {
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .memory-stats {
+            font-size: 0.9em;
+            opacity: 0.7;
+        }
+        
+        .memory-content {
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+            opacity: 0.6;
+        }
+        
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 20px auto;
+            display: block;
+        }
+        
+        .refresh-btn:hover {
+            background: #5568d3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧠 SupaStats Dashboard</h1>
+            <div class="subtitle">Real-time Memory Analytics for Scar</div>
+        </header>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Memories</div>
+                <div class="stat-value" id="total-memories">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Importance</div>
+                <div class="stat-value" id="avg-importance">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Accesses</div>
+                <div class="stat-value" id="total-accesses">-</div>
+            </div>
+        </div>
+        
+        <div class="charts-grid">
+            <div class="chart-card">
+                <div class="chart-title">📊 Temporal Layer Distribution</div>
+                <canvas id="temporal-chart"></canvas>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">🎯 Memory Types</div>
+                <canvas id="types-chart"></canvas>
+            </div>
+        </div>
+        
+        <div class="memories-list">
+            <div class="chart-title">🔥 Top Accessed Memories</div>
+            <div id="top-memories">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+        
+        <button class="refresh-btn" onclick="loadData()">🔄 Refresh Data</button>
+    </div>
+    
+    <script>
+        const API_BASE = '/api/v1';
+        const AGENT_NAME = 'Scar';
+        
+        let temporalChart, typesChart;
+        
+        async function loadData() {
+            try {
+                // Load basic stats
+                const statsRes = await fetch(`${API_BASE}/stats?agent_name=${AGENT_NAME}`);
+                const stats = await statsRes.json();
+                
+                document.getElementById('total-memories').textContent = stats.total_memories.toLocaleString();
+                document.getElementById('avg-importance').textContent = stats.average_importance.toFixed(2);
+                document.getElementById('total-accesses').textContent = stats.total_accesses.toLocaleString();
+                
+                // Load temporal distribution
+                const temporalRes = await fetch(`${API_BASE}/analytics/temporal-distribution?agent_name=${AGENT_NAME}`);
+                const temporal = await temporalRes.json();
+                updateTemporalChart(temporal);
+                
+                // Load memory types
+                const typesRes = await fetch(`${API_BASE}/analytics/memory-types?agent_name=${AGENT_NAME}`);
+                const types = await typesRes.json();
+                updateTypesChart(types);
+                
+                // Load top memories
+                const topRes = await fetch(`${API_BASE}/analytics/top-memories?agent_name=${AGENT_NAME}&limit=10`);
+                const topMemories = await topRes.json();
+                updateTopMemories(topMemories);
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                alert('Failed to load data. Check console for details.');
+            }
+        }
+        
+        function updateTemporalChart(data) {
+            const ctx = document.getElementById('temporal-chart').getContext('2d');
+            
+            if (temporalChart) {
+                temporalChart.destroy();
+            }
+            
+            temporalChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Working', 'Short', 'Long', 'Archive'],
+                    datasets: [{
+                        data: [data.working, data.short, data.long, data.archive],
+                        backgroundColor: [
+                            '#ff6384',
+                            '#36a2eb',
+                            '#4bc0c0',
+                            '#9966ff'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#e0e0e0',
+                                font: { size: 14 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateTypesChart(data) {
+            const ctx = document.getElementById('types-chart').getContext('2d');
+            
+            if (typesChart) {
+                typesChart.destroy();
+            }
+            
+            typesChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Facts', 'Experiences', 'Skills', 'Preferences', 'Decisions', 'Context'],
+                    datasets: [{
+                        label: 'Count',
+                        data: [data.facts, data.experiences, data.skills, data.preferences, data.decisions, data.context],
+                        backgroundColor: '#667eea'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#e0e0e0'
+                            },
+                            grid: {
+                                color: '#2a3550'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#e0e0e0'
+                            },
+                            grid: {
+                                color: '#2a3550'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateTopMemories(memories) {
+            const container = document.getElementById('top-memories');
+            
+            if (memories.length === 0) {
+                container.innerHTML = '<div class="loading">No memories found</div>';
+                return;
+            }
+            
+            container.innerHTML = memories.map(mem => `
+                <div class="memory-item">
+                    <div class="memory-header">
+                        <span class="memory-id">#${mem.memory_id}</span>
+                        <span class="memory-stats">
+                            👁️ ${mem.access_count} accesses | 
+                            ⭐ ${mem.importance_score.toFixed(2)} | 
+                            📁 ${mem.temporal_layer}
+                        </span>
+                    </div>
+                    <div class="memory-content">${mem.layer_1_summary}</div>
+                </div>
+            `).join('');
+        }
+        
+        // Load data on page load
+        loadData();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadData, 30000);
+    </script>
+</body>
+</html>

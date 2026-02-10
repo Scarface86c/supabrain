@@ -6,6 +6,8 @@ Multi-Layer Memory System for AI Agents
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
@@ -16,8 +18,7 @@ from rate_limiter import rate_limit_middleware
 from auth import auth_middleware
 
 # Import routers
-from routes import health, memory, stats, review, tags, learning, identity, recovery
-# analytics temporarily disabled - has import issues
+from routes import health, memory, stats, review, tags, learning, identity, recovery, analytics
 
 # Configuration
 DEFAULT_AGENT_NAME = os.getenv("DEFAULT_AGENT_NAME", None)  # No default - must be explicit!
@@ -68,7 +69,21 @@ app.include_router(tags.router)
 app.include_router(learning.router)
 app.include_router(identity.router)
 app.include_router(recovery.router)
-# app.include_router(analytics.router)  # Disabled - needs debugging
+app.include_router(analytics.router)
+
+# Serve static files and dashboard
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/dashboard")
+async def dashboard():
+    """SupaStats Dashboard"""
+    return FileResponse("static/dashboard.html")
+
+@app.get("/")
+async def root():
+    """Redirect to dashboard"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/dashboard")
 
 
 # Main entry point

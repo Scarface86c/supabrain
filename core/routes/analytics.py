@@ -73,7 +73,7 @@ async def get_top_memories(
             m.created_at
         FROM memories m
         JOIN agents a ON m.agent_id = a.id
-        WHERE LOWER(a.name) = LOWER($1)
+        WHERE LOWER(a.agent_name) = LOWER($1)
           AND m.status = 'active'
           AND m.is_current = true
         ORDER BY m.{sort_by} DESC NULLS LAST
@@ -113,7 +113,7 @@ async def get_temporal_distribution(agent_name: str):
             COUNT(*) as count
         FROM memories m
         JOIN agents a ON m.agent_id = a.id
-        WHERE LOWER(a.name) = LOWER($1)
+        WHERE LOWER(a.agent_name) = LOWER($1)
           AND m.status = 'active'
           AND m.is_current = true
         GROUP BY temporal_layer
@@ -150,7 +150,7 @@ async def get_memory_type_distribution(agent_name: str):
             COUNT(*) as count
         FROM memories m
         JOIN agents a ON m.agent_id = a.id
-        WHERE LOWER(a.name) = LOWER($1)
+        WHERE LOWER(a.agent_name) = LOWER($1)
           AND m.status = 'active'
           AND m.is_current = true
           AND memory_type IS NOT NULL
