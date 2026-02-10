@@ -16,7 +16,7 @@ from rate_limiter import rate_limit_middleware
 from auth import auth_middleware
 
 # Import routers
-from routes import health, memory, stats, review, tags, learning, identity, recovery
+from routes import health, memory, stats, review, tags, learning, identity, recovery, analytics
 
 # Configuration
 DEFAULT_AGENT_NAME = os.getenv("DEFAULT_AGENT_NAME", None)  # No default - must be explicit!
@@ -67,6 +67,7 @@ app.include_router(tags.router)
 app.include_router(learning.router)
 app.include_router(identity.router)
 app.include_router(recovery.router)
+app.include_router(analytics.router)
 
 
 # Main entry point
