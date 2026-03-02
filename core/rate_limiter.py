@@ -5,9 +5,9 @@ Simple token bucket implementation with in-memory storage
 """
 
 import time
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Callable, Awaitable
 from fastapi import Request, HTTPException, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 import os
 
 
@@ -74,7 +74,7 @@ rate_limiter = RateLimiter(
 )
 
 
-async def rate_limit_middleware(request: Request, call_next):
+async def rate_limit_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     """FastAPI middleware for rate limiting"""
     
     # Skip rate limiting if disabled
@@ -86,7 +86,9 @@ async def rate_limit_middleware(request: Request, call_next):
         return await call_next(request)
     
     # Get client IP (handle proxies via X-Forwarded-For)
-    client_ip = request.headers.get("X-Forwarded-For", request.client.host).split(",")[0].strip()
+    # Note: request.client may be None in test environments (TestClient)
+    fallback_ip = request.client.host if request.client else "127.0.0.1"
+    client_ip = request.headers.get("X-Forwarded-For", fallback_ip).split(",")[0].strip()
     
     # Check rate limit
     if not rate_limiter.is_allowed(client_ip):
